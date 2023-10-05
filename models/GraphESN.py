@@ -11,12 +11,16 @@ import torch.nn as nn
 import torch.sparse
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
-
-# import torch_geometric.typing
 from torch_geometric.typing import torch_sparse
-# from torch_sparse import matmul
+from torch_geometric.utils import add_self_loops
 
-from models.utils import _GraphRNN, get_functional_activation, self_normalizing_activation
+from torch_sparse import SparseTensor
+
+from tsl.ops.connectivity import normalize_connectivity
+
+from einops import rearrange
+
+from models.utils import _GraphRNN, get_functional_activation, self_normalizing_activation, normalize
 
 
 class GESNLayer(MessagePassing):
@@ -145,3 +149,42 @@ class GraphESN(_GraphRNN):
     def reset_parameters(self):
         for layer in self.rnn_cells:
             layer.reset_parameters()
+
+
+class GESNModel(nn.Module):
+    def __init__(self,
+                 input_size,
+                 reservoir_size,
+                 reservoir_layers,
+                 leaking_rate,
+                 spectral_radius,
+                 density,
+                 input_scaling,
+                 alpha_decay,
+                 reservoir_activation='tanh'
+                 ):
+        super(GESNModel, self).__init__()
+        self.reservoir = GraphESN(input_size=input_size,
+                                  hidden_size=reservoir_size,
+                                  input_scaling=input_scaling,
+                                  num_layers=reservoir_layers,
+                                  leaking_rate=leaking_rate,
+                                  spectral_radius=spectral_radius,
+                                  density=density,
+                                  activation=reservoir_activation,
+                                  alpha_decay=alpha_decay)
+
+    def forward(self, x, edge_index, edge_weight):
+        # # x : [t n f]
+        # x = rearrange(x, 't n f -> 1 t n f')
+        # x : [n f]
+        x = rearrange(x, 'n f -> 1 n f')
+        edge_index, edge_weight = add_self_loops(edge_index, edge_weight)
+        if not isinstance(edge_index, SparseTensor):
+            num_nodes = None #x.shape[0]
+            _, edge_weight = normalize(edge_index, edge_weight)
+            col, row = edge_index
+            edge_index = SparseTensor(row=row, col=col, value=edge_weight,
+                                      sparse_sizes=(x.size(-2), x.size(-2)))
+        x, _ = self.reservoir(x, edge_index)
+        return x[0]

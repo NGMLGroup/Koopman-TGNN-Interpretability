@@ -1,10 +1,14 @@
 import torch
+import torch_sparse
 import numpy as np
 
 from typing import Optional, Union, Tuple, List
 from torch import Tensor
 from torch.nn import functional as F
 from einops import rearrange
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
+from torch_sparse import SparseTensor
+from types import ModuleType
 
 
 _torch_activations_dict = {
@@ -135,3 +139,85 @@ def maybe_cat_exog(x, u, dim=-1):
             u = rearrange(u, 'b s f -> b s 1 f')
         x = expand_then_cat([x, u], dim)
     return x
+
+
+TensArray = Union[Tensor, np.ndarray]
+OptTensArray = Optional[TensArray]
+ScipySparseMatrix = Union[coo_matrix, csr_matrix, csc_matrix]
+SparseTensArray = Union[Tensor, SparseTensor, np.ndarray, ScipySparseMatrix]
+
+def maybe_num_nodes(edge_index, num_nodes=None):
+    if num_nodes is not None:
+        return num_nodes
+    elif isinstance(edge_index, np.ndarray):
+        return int(edge_index.max()) + 1 if edge_index.size > 0 else 0
+    elif isinstance(edge_index, Tensor):
+        return int(edge_index.max()) + 1 if edge_index.numel() > 0 else 0
+    else:
+        return max(edge_index.size(0), edge_index.size(1))
+
+
+def infer_backend(obj, backend: ModuleType = None):
+    if backend is not None:
+        return backend
+    elif isinstance(obj, Tensor):
+        return torch
+    elif isinstance(obj, np.ndarray):
+        return np
+    elif isinstance(obj, SparseTensor):
+        return torch_sparse
+    raise RuntimeError(f"Cannot infer valid backed from {type(obj)}.")
+
+def weighted_degree(index: TensArray, weights: OptTensArray = None,
+                    num_nodes: Optional[int] = None) -> TensArray:
+    r"""Computes the weighted degree of a given one-dimensional index tensor.
+
+    Args:
+        index (LongTensor): Index tensor.
+        weights (Tensor): Edge weights tensor.
+        num_nodes (int, optional): The number of nodes, *i.e.*
+            :obj:`max_val + 1` of :attr:`index`. (default: :obj:`None`)
+    """
+    N = maybe_num_nodes(index, num_nodes)
+    if isinstance(index, Tensor):
+        if weights is None:
+            weights = torch.ones((index.size(0),),
+                                 device=index.device, dtype=torch.int)
+        out = torch.zeros((N,1), dtype=weights.dtype, device=weights.device)
+        out.scatter_add_(0, index.unsqueeze(dim=-1), weights)
+    else:
+        if weights is None:
+            weights = np.ones(index.shape[0], dtype=np.int)
+        out = np.zeros(N, dtype=weights.dtype)
+        np.add.at(out, index, weights)
+    return out
+
+
+def normalize(edge_index: SparseTensArray, edge_weights: OptTensArray = None,
+              dim: int = 0, num_nodes: Optional[int] = None) \
+        -> Tuple[SparseTensArray, OptTensArray]:
+    r"""Normalize edge weights across dimension :obj:`dim`.
+
+    .. math::
+        e_{i,j} =  \frac{e_{i,j}}{deg_{i}\ \text{if dim=0 else}\ deg_{j}}
+
+    Args:
+        edge_index (LongTensor): Edge index tensor.
+        edge_weights (Tensor): Edge weights tensor.
+        dim (int): Dimension over which to compute normalization.
+        num_nodes (int, optional): The number of nodes, *i.e.*
+            :obj:`max_val + 1` of :attr:`index`. (default: :obj:`None`)
+    """
+    backend = infer_backend(edge_index)
+
+    if backend is torch_sparse:
+        assert edge_weights is None
+        deg = edge_index.sum(dim=dim).to(torch.float)
+        deg_inv = deg.pow(-1.0)
+        deg_inv[deg_inv == float('inf')] = 0
+        edge_index = deg_inv.view(-1, 1) * edge_index
+        return edge_index, None
+
+    index = edge_index[dim]
+    degree = weighted_degree(index, edge_weights, num_nodes=num_nodes)
+    return edge_index, edge_weights / degree[index]
