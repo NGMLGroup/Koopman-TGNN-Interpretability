@@ -120,6 +120,7 @@ class GraphESN(nn.Module):
         self.spectral_radius = spectral_radius
         self.density = density
         self.alpha_decay = alpha_decay
+        self.states = []
 
         layers = []
         alpha = leaking_rate
@@ -157,7 +158,8 @@ class GraphESN(nn.Module):
         for s in range(self.steps):
             out = self.layers[i](x, h_new[-1], edge_index, edge_weight, *args, **kwargs)
             h_new.append(out)
-        return h_new
+        self.states = h_new
+        return out
 
     def forward(self, x, edge_index, edge_weight=None, h=None, *args, **kwargs):
         # TODO: batches
@@ -166,11 +168,7 @@ class GraphESN(nn.Module):
             h = self._init_states(x)
 
         for i in range(self.n_layers):
-            h_steps = self.single_layer(i, x, edge_index, h, edge_weight, *args, **kwargs)
-            x = h_steps[-1]
-
-        out = x 
+            x = self.single_layer(i, x, edge_index, h, edge_weight, *args, **kwargs)
         
-        # out: [nodes, hidden_size]
-        # h_steps: len=steps, h_steps[i]: [nodes, hidden_size]
-        return out, h_steps
+        # x: [nodes, hidden_size]
+        return x
