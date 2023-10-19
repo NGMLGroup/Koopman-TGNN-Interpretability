@@ -1,26 +1,21 @@
 """
 
-Source: https://github.com/Graph-Machine-Learning-Group/sgp/tree/main
 Code extensively inspired by https://github.com/stefanonardo/pytorch-esn
 
 """
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.sparse
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
-from torch_geometric.typing import torch_sparse
-from torch_geometric.utils import add_self_loops
-
-from torch_sparse import SparseTensor
-
-from tsl.ops.connectivity import normalize_connectivity
-
+from torch_sparse import matmul
 from einops import rearrange
+from tsl.nn.utils import get_functional_activation
 
-from models.utils import _GraphRNN, get_functional_activation, self_normalizing_activation, normalize
+
+def self_normalizing_activation(x: torch.Tensor, r: float = 1.0):
+    return r * F.normalize(x, p=2, dim=-1)
 
 
 class GESNLayer(MessagePassing):
@@ -83,11 +78,11 @@ class GESNLayer(MessagePassing):
         abs_eigs = torch.linalg.eigvals(self.w_hh.data).abs()
         self.w_hh.data.mul_(self.spectral_radius / torch.max(abs_eigs))
 
-    def message(self, x_j, edge_weight):
-        return edge_weight.view(-1, 1) * x_j
+    # def message(self, x_j, edge_weight): # TODO: how to add edge_weight? what formula to use?
+    #     return edge_weight.view(-1, 1) * x_j
 
     def message_and_aggregate(self, adj_t, x):
-        return torch_sparse.matmul(adj_t, x, reduce=self.aggr)
+        return matmul(adj_t, x, reduce=self.aggr)
 
     def forward(self, x, h, edge_index, edge_weight=None):
         """This layer expects a normalized adjacency matrix either in
@@ -100,30 +95,30 @@ class GESNLayer(MessagePassing):
         return h_new
 
 
-class GraphESN(_GraphRNN):
+class GraphESN(nn.Module):
     _cat_states_layers = True
 
     def __init__(self,
                  input_size,
                  hidden_size,
+                 steps=10,
                  input_scaling=1.,
                  num_layers=1,
                  leaking_rate=0.9,
                  spectral_radius=0.9,
                  density=0.9,
                  activation='tanh',
-                 bias=True,
                  alpha_decay=False):
         super(GraphESN, self).__init__()
         self.mode = activation
         self.input_size = input_size
         self.input_scaling = input_scaling
         self.hidden_size = hidden_size
+        self.steps = 10
         self.n_layers = num_layers
         self.leaking_rate = leaking_rate
         self.spectral_radius = spectral_radius
         self.density = density
-        self.bias = bias
         self.alpha_decay = alpha_decay
 
         layers = []
@@ -142,49 +137,40 @@ class GraphESN(_GraphRNN):
             if self.alpha_decay:
                 alpha = np.clip(alpha - 0.1, 0.1, 1.)
 
-        self.rnn_cells = nn.ModuleList(layers)
+        self.layers = nn.ModuleList(layers)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        for layer in self.rnn_cells:
+        for layer in self.layers:
             layer.reset_parameters()
+    
+    def _init_states(self, x):
+        # h: [nodes, hidden_size]
+        return torch.zeros(size=(x.shape[-2], self.hidden_size), device=x.device)
 
+    def single_layer(self, i, x, edge_index, h, edge_weight=None, *args, **kwargs):
+        # x: [nodes, channels]
+        # h: [nodes, hidden_size]
+        h_new = [h]
+        out = x
+        for s in range(self.steps):
+            out = self.layers[i](x, h_new[-1], edge_index, edge_weight, *args, **kwargs)
+            h_new.append(out)
+        return h_new
 
-class GESNModel(nn.Module):
-    def __init__(self,
-                 input_size,
-                 reservoir_size,
-                 reservoir_layers,
-                 leaking_rate,
-                 spectral_radius,
-                 density,
-                 input_scaling,
-                 alpha_decay,
-                 reservoir_activation='tanh'
-                 ):
-        super(GESNModel, self).__init__()
-        self.reservoir = GraphESN(input_size=input_size,
-                                  hidden_size=reservoir_size,
-                                  input_scaling=input_scaling,
-                                  num_layers=reservoir_layers,
-                                  leaking_rate=leaking_rate,
-                                  spectral_radius=spectral_radius,
-                                  density=density,
-                                  activation=reservoir_activation,
-                                  alpha_decay=alpha_decay)
+    def forward(self, x, edge_index, edge_weight=None, h=None, *args, **kwargs):
+        # TODO: batches
+        # x: [nodes, channels]
+        if h is None:
+            h = self._init_states(x)
 
-    def forward(self, x, edge_index, edge_weight):
-        # # x : [t n f]
-        # x = rearrange(x, 't n f -> 1 t n f')
-        # x : [n f]
-        x = rearrange(x, 'n f -> 1 n f')
-        edge_index, edge_weight = add_self_loops(edge_index, edge_weight)
-        if not isinstance(edge_index, SparseTensor):
-            num_nodes = None #x.shape[0]
-            _, edge_weight = normalize(edge_index, edge_weight)
-            col, row = edge_index
-            edge_index = SparseTensor(row=row, col=col, value=edge_weight,
-                                      sparse_sizes=(x.size(-2), x.size(-2)))
-        x, _ = self.reservoir(x, edge_index)
-        return x[0]
+        for i in range(self.n_layers):
+            h_steps = self.single_layer(i, x, edge_index, h, edge_weight, *args, **kwargs)
+            x = h_steps[-1]
+
+        out = x 
+        
+        # out: [nodes, hidden_size]
+        # h_steps: len=steps, h_steps[i]: [nodes, hidden_size]
+        return out, h_steps
