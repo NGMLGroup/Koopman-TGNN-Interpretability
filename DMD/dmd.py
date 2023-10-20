@@ -25,11 +25,15 @@ class KANN:
             self.emb_engine = TruncatedSVD(n_components=self.k)
         elif self.emb == "PCA":
             self.emb_engine = PCA(n_components=self.k)
+        elif self.emb == None:
+            self.emb_engine = None
+            self.k = self.Z.shape[-1]
 
         # compute principal components
-        if len(self.Z.shape) == 2:
+        if self.emb == None:
+            self.Zp = Z
+        elif len(self.Z.shape) == 2:
             self.Zp = self.emb_engine.fit_transform(self.Z)
-
         else:
             bsz, sqsz, hsz = self.Z.shape
 

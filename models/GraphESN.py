@@ -114,7 +114,7 @@ class GraphESN(nn.Module):
         self.input_size = input_size
         self.input_scaling = input_scaling
         self.hidden_size = hidden_size
-        self.steps = 10
+        self.steps = steps
         self.n_layers = num_layers
         self.leaking_rate = leaking_rate
         self.spectral_radius = spectral_radius
