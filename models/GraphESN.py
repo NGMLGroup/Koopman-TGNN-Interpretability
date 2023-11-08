@@ -108,6 +108,7 @@ class GraphESN(nn.Module):
                  spectral_radius=0.9,
                  density=0.9,
                  activation='tanh',
+                 conv_thr=1e-5,
                  alpha_decay=False):
         super(GraphESN, self).__init__()
         self.mode = activation
@@ -120,6 +121,7 @@ class GraphESN(nn.Module):
         self.spectral_radius = spectral_radius
         self.density = density
         self.alpha_decay = alpha_decay
+        self.conv_thr = conv_thr
         self.states = []
 
         layers = []
@@ -155,9 +157,19 @@ class GraphESN(nn.Module):
         # h: [nodes, hidden_size]
         h_new = [h]
         out = x
-        for s in range(self.steps):
+
+        converged = False
+        step = 0
+
+        while not converged:
             out = self.layers[i](x, h_new[-1], edge_index, edge_weight, *args, **kwargs)
-            h_new.append(out)
+
+            if torch.norm(out - h_new[-1]) < self.conv_thr or step >= self.steps:
+                converged = True
+
+            h_new.append(out)            
+            step += 1
+
         self.states = h_new
         return out
 

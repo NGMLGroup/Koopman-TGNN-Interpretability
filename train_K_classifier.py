@@ -35,7 +35,7 @@ else:
 
 dataset = TUDataset(root='/ESGNN/data/MUTAG', name='MUTAG')
 
-koops = torch.load('KOP/TruncatedSVD_5.pt')
+koops = torch.load('KOP/quadr_TruncatedSVD_5.pt')
 
 K_train, K_test, y_train, y_test = train_test_split(koops, dataset.y, test_size=0.3, random_state=seed)
 
