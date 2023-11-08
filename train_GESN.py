@@ -5,6 +5,7 @@ import random
 import numpy as np
 
 from torch_geometric.datasets import TUDataset
+from dataset.NCI1_dataset import NCI1
 from tqdm import trange
 from models.GraphESN import GraphESN
 from sklearn.model_selection import train_test_split
@@ -15,7 +16,7 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 
 config = {
-    'input_size': 7,
+    # 'input_size': 7,
     'hidden_size': 286,
     'conv_steps': 52,
     'input_scaling': 0.26371404282791244,
@@ -41,10 +42,11 @@ else:
 
 
 
-dataset = TUDataset(root='/ESGNN/data/MUTAG', name='MUTAG')
+# dataset = TUDataset(root='/ESGNN/data/MUTAG', name='MUTAG')
+dataset = NCI1('dataset/NCI1/')
+input_size = dataset[0]['x'].shape[1]
 
-
-model = GraphESN(input_size=config.input_size,
+model = GraphESN(input_size=input_size,
                 hidden_size=config.hidden_size,
                 steps=config.conv_steps,
                 input_scaling=config.input_scaling,
