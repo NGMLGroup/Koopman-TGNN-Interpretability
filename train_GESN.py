@@ -55,11 +55,11 @@ model = GraphESN(input_size=input_size,
                 spectral_radius=config.spectral_radius,
                 density=config.density,
                 activation=config.activation,
-                alpha_decay=False)
+                alpha_decay=False).to(device)
 
 embs = []
 for g in dataset:
-    embs.append(model(g['x'], g['edge_index']).mean(dim=0))
+    embs.append(model(g['x'].to(device), g['edge_index'].to(device)).mean(dim=0))
 embs = torch.stack(embs).to(device)
 
 X_train, X_test, y_train, y_test = train_test_split(embs, dataset.y, test_size=0.3, random_state=seed)
