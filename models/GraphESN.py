@@ -9,9 +9,8 @@ import torch.nn as nn
 import torch.sparse
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
-from torch_sparse import matmul
-from einops import rearrange
 from tsl.nn.utils import get_functional_activation
+from torch_geometric.utils import add_self_loops
 
 
 def self_normalizing_activation(x: torch.Tensor, r: float = 1.0):
@@ -29,7 +28,7 @@ class GESNLayer(MessagePassing):
                  in_scaling=1.,
                  bias_scale=1.,
                  activation='tanh',
-                 aggr='add'):
+                 aggr='sum'):
         super(GESNLayer, self).__init__(aggr=aggr)
         self.w_ih_scale = in_scaling
         self.b_scale = bias_scale
@@ -78,11 +77,12 @@ class GESNLayer(MessagePassing):
         abs_eigs = torch.linalg.eigvals(self.w_hh.data).abs()
         self.w_hh.data.mul_(self.spectral_radius / torch.max(abs_eigs))
 
-    # def message(self, x_j, edge_weight): # TODO: how to add edge_weight? what formula to use?
-    #     return edge_weight.view(-1, 1) * x_j
+    def message(self, x_j, edge_weight): # TODO: how to add edge_weight? what formula to use?
+        # return edge_weight.view(-1, 1) * x_j
+        return x_j
 
-    def message_and_aggregate(self, adj_t, x):
-        return matmul(adj_t, x, reduce=self.aggr)
+    # def message_and_aggregate(self, adj_t, x): # NOTE: What's this method for?
+    #     return matmul(adj_t, x, reduce=self.aggr)
 
     def forward(self, x, h, edge_index, edge_weight=None):
         """This layer expects a normalized adjacency matrix either in
@@ -176,6 +176,9 @@ class GraphESN(nn.Module):
     def forward(self, x, edge_index, edge_weight=None, h=None, *args, **kwargs):
         # TODO: batches
         # x: [nodes, channels]
+
+        # edge_index, edge_weight = add_self_loops(edge_index, edge_weight) # NOTE: Should I add self loops?
+
         if h is None:
             h = self._init_states(x)
 
