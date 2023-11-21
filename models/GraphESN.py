@@ -10,7 +10,7 @@ import torch.sparse
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from tsl.nn.utils import get_functional_activation
-from torch_geometric.utils import add_self_loops
+from torch_geometric.utils import add_self_loops, degree
 
 
 def self_normalizing_activation(x: torch.Tensor, r: float = 1.0):
@@ -77,9 +77,9 @@ class GESNLayer(MessagePassing):
         abs_eigs = torch.linalg.eigvals(self.w_hh.data).abs()
         self.w_hh.data.mul_(self.spectral_radius / torch.max(abs_eigs))
 
-    def message(self, x_j, edge_weight): # TODO: how to add edge_weight? what formula to use?
+    def message(self, x_j, edge_weight, norm): # TODO: how to add edge_weight? what formula to use?
         # return edge_weight.view(-1, 1) * x_j
-        return x_j
+        return norm.view(-1, 1) * x_j
 
     # def message_and_aggregate(self, adj_t, x): # NOTE: What's this method for?
     #     return matmul(adj_t, x, reduce=self.aggr)
@@ -87,10 +87,19 @@ class GESNLayer(MessagePassing):
     def forward(self, x, h, edge_index, edge_weight=None):
         """This layer expects a normalized adjacency matrix either in
         edge_index or SparseTensor layout."""
+
+        # Compute normalization.
+        row, col = edge_index
+        deg = degree(col, x.size(0), dtype=x.dtype)
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+
         h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
                                 self.propagate(edge_index,
                                                x=F.linear(h, self.w_hh),
-                                               edge_weight=edge_weight))
+                                               edge_weight=edge_weight,
+                                               norm=norm))
         h_new = (1 - self.alpha) * h + self.alpha * h_new
         return h_new
 
