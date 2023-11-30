@@ -1,8 +1,14 @@
-dataset/TU
+dataset/infect*
+dataset/multi*
+dataset/MUTAG
+dataset/NCI1
+dataset/pv*
+dataset/spain*
 HAVOK
 checkpoints
 test.py
 wandb
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
