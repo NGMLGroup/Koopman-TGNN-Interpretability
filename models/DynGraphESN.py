@@ -84,7 +84,7 @@ class GESNLayer(MessagePassing):
         self.w_hh.data.mul_(self.spectral_radius / torch.max(abs_eigs))
 
     def message(self, x_j, edge_weight):
-        return edge_weight.view(-1, 1) * x_j
+        return edge_weight.view(-1, 1) * x_j if edge_weight else x_j
 
     def message_and_aggregate(self, adj_t, x):
         return torch_sparse.matmul(adj_t, x, reduce=self.aggr)
