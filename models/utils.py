@@ -181,10 +181,10 @@ def weighted_degree(index: TensArray, weights: OptTensArray = None,
     N = maybe_num_nodes(index, num_nodes)
     if isinstance(index, Tensor):
         if weights is None:
-            weights = torch.ones((index.size(0),),
+            weights = torch.ones((index.size(0)),
                                  device=index.device, dtype=torch.int)
         out = torch.zeros((N,1), dtype=weights.dtype, device=weights.device)
-        out.scatter_add_(0, index.unsqueeze(dim=-1), weights)
+        out.scatter_add_(0, index.unsqueeze(dim=-1), weights.unsqueeze(dim=-1))
     else:
         if weights is None:
             weights = np.ones(index.shape[0], dtype=np.int)
@@ -220,4 +220,4 @@ def normalize(edge_index: SparseTensArray, edge_weights: OptTensArray = None,
 
     index = edge_index[dim]
     degree = weighted_degree(index, edge_weights, num_nodes=num_nodes)
-    return edge_index, edge_weights / degree[index]
+    return edge_index, edge_weights / degree[index].squeeze()
