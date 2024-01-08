@@ -4,6 +4,8 @@ dataset/MUTAG
 dataset/NCI1
 dataset/pv*
 dataset/spain*
+lightning_logs
+logs
 HAVOK
 checkpoints
 test.py
