@@ -1,3 +1,7 @@
+"""
+Source: https://github.com/Graph-Machine-Learning-Group/sgp/blob/main/tsl/nn/blocks/encoders/gcrnn.py#L43
+"""
+
 import torch
 import torch_sparse
 import numpy as np
