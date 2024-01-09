@@ -75,7 +75,7 @@ dm.setup()
 model = DynGESNModel(input_size=feat_size,
                 reservoir_size=config.reservoir_size,
                 input_scaling=config.input_scaling,
-                reservoir_layers=1,
+                reservoir_layers=config.num_layers,
                 leaking_rate=config.leaking_rate,
                 spectral_radius=config.spectral_radius,
                 density=config.density,
@@ -83,22 +83,21 @@ model = DynGESNModel(input_size=feat_size,
                 alpha_decay=False).to(device)
 
 class LinearRegression(pl.LightningModule):
-    def __init__(self, encoder, input_size, output_size, horizon):
+    def __init__(self, encoder, input_size, output_size):
         super().__init__()
         self.output_size = output_size
         self.encoder = encoder
-        self.linear = nn.Linear(input_size, output_size*horizon)
+        self.linear = nn.Linear(input_size, output_size)
 
     def forward(self, x, edge_index, edge_weight):
         z = self.encoder(x, edge_index, edge_weight)
         b, t, n, f = z.shape
-        z = rearrange(z, 'b t n f -> b n (t f)', t=t, n=n)
         new_x = self.linear(z)
-        new_x = rearrange(new_x, 'b n (t f) -> b t n f', t=horizon, n=n, f=self.output_size)
+        new_x = rearrange(new_x, 'b n f -> f n b', n=n, f=self.output_size)
 
         return new_x
 
-forecaster = LinearRegression(model, input_size=config.reservoir_size*time_interval, output_size=feat_size, horizon=horizon).to(device)
+forecaster = LinearRegression(model, input_size=config.reservoir_size*config.num_layers, output_size=feat_size*horizon).to(device)
 
 loss_fn = MaskedMAE()
 

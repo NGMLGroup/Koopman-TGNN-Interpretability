@@ -1,6 +1,7 @@
 """
 
 Source: https://github.com/Graph-Machine-Learning-Group/sgp/tree/main
+        https://github.com/Graph-Machine-Learning-Group/sgp/blob/main/lib/nn/reservoir/graph_reservoir.py#L96
 Code extensively inspired by https://github.com/stefanonardo/pytorch-esn
 
 """
@@ -184,6 +185,8 @@ class DynGESNModel(nn.Module):
             col, row = edge_index
             edge_index = SparseTensor(row=row, col=col, value=edge_weight,
                                       sparse_sizes=(x.size(-2), x.size(-2)))
-        x, _ = self.reservoir(x, edge_index)
+        x, h = self.reservoir(x, edge_index)
 
-        return x
+        h = rearrange(h, 'l b n f -> b n (l f)')
+
+        return h # (batch, nodes, layers x reservoir_size)
