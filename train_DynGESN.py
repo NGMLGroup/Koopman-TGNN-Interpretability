@@ -91,7 +91,7 @@ class LinearRegression(pl.LightningModule):
 
     def forward(self, x, edge_index, edge_weight):
         z = self.encoder(x, edge_index, edge_weight)
-        b, t, n, f = z.shape
+        b, n, f = z.shape
         new_x = self.linear(z)
         new_x = rearrange(new_x, 'b n f -> f n b', n=n, f=self.output_size)
 
