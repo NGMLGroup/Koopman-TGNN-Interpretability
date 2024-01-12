@@ -10,7 +10,7 @@ HAVOK
 checkpoints
 test.py
 wandb
-*.pt
+# *.pt
 *.gexf
 *.gephi
 *.h5
