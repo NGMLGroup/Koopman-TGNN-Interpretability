@@ -28,7 +28,6 @@ config = {
     'window': 128,
     'stride': 1,
     'reservoir_size': 100,
-    'conv_steps': 52,
     'input_scaling': 1.,
     'num_layers': 1,
     'leaking_rate': 0.9,
@@ -121,16 +120,18 @@ checkpoint_callback = ModelCheckpoint(
     monitor='val_mae',
     mode='min',
 )
-early_stop_callback = EarlyStopping(monitor="val_mae", min_delta=0.01, patience=3, verbose=False, mode="max")
+early_stop_callback = EarlyStopping(monitor="val_mae", min_delta=0.0, patience=5, verbose=True, mode="min")
 
 wandb_logger = WandbLogger(name='dyngesn',project='koopman')
 
 trainer = pl.Trainer(max_epochs=config.epochs,
-                     logger=wandb_logger,
-                     devices=1, 
-                     accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                     limit_train_batches=100,  # end an epoch after 100 updates
-                     callbacks=[checkpoint_callback, early_stop_callback],
-                     deterministic=True)
+                    logger=wandb_logger,
+                    devices=1, 
+                    accelerator="gpu" if torch.cuda.is_available() else "cpu",
+                    limit_train_batches=0.1, 
+                    limit_val_batches=0.1,
+                    #  limit_train_batches=100,  # end an epoch after 100 updates
+                    callbacks=[checkpoint_callback, early_stop_callback],
+                    deterministic=True)
 
 trainer.fit(predictor, datamodule=dm)
