@@ -12,6 +12,7 @@ from tsl.data.preprocessing import StandardScaler
 from tsl.metrics.torch import MaskedMAE
 from tsl.engines import Predictor
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from einops import rearrange
 
@@ -24,6 +25,8 @@ np.random.seed(seed)
 pl.seed_everything(42)
 
 config = {
+    'window': 128,
+    'stride': 1,
     'reservoir_size': 100,
     'conv_steps': 52,
     'input_scaling': 1.,
@@ -56,8 +59,8 @@ torch_dataset = tsl.data.SpatioTemporalDataset(target=dataset.dataframe(),
                                       connectivity=connectivity,
                                       mask=dataset.mask,
                                       horizon=horizon,
-                                      window=64,
-                                      stride=1)
+                                      window=config.window,
+                                      stride=config.stride)
 
 sample = torch_dataset[0].to(device)
 time_interval, num_nodes, feat_size = sample.input.x.shape
@@ -118,6 +121,7 @@ checkpoint_callback = ModelCheckpoint(
     monitor='val_mae',
     mode='min',
 )
+early_stop_callback = EarlyStopping(monitor="val_mae", min_delta=0.01, patience=3, verbose=False, mode="max")
 
 wandb_logger = WandbLogger(name='dyngesn',project='koopman')
 
@@ -126,7 +130,7 @@ trainer = pl.Trainer(max_epochs=config.epochs,
                      devices=1, 
                      accelerator="gpu" if torch.cuda.is_available() else "cpu",
                      limit_train_batches=100,  # end an epoch after 100 updates
-                     callbacks=[checkpoint_callback],
+                     callbacks=[checkpoint_callback, early_stop_callback],
                      deterministic=True)
 
 trainer.fit(predictor, datamodule=dm)
