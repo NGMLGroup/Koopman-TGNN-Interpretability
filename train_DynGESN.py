@@ -20,6 +20,7 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 pl.seed_everything(42)
 
+
 if torch.cuda.is_available():
     device = torch.device('cuda')
 else:
@@ -27,6 +28,7 @@ else:
 
 config = {
     'reservoir_size': 100,
+    'conv_steps': 52,
     'input_scaling': 1.,
     'reservoir_layers': 1,
     'leaking_rate': 0.9,
@@ -60,7 +62,7 @@ class LinearRegression(pl.LightningModule):
 
 model_file_path = "models/saved/DynGESN.pt"
 model = torch.load(model_file_path)
-forecaster = LinearRegression(model, input_size=config.reservoir_size*config.num_layers, output_size=feat_size*horizon).to(device)
+forecaster = LinearRegression(model, input_size=config.reservoir_size*config.num_layers, output_size=1).to(device)
 
 loss_fn = MaskedMAE()
 
@@ -81,16 +83,18 @@ checkpoint_callback = ModelCheckpoint(
     monitor='val_mae',
     mode='min',
 )
-early_stop_callback = EarlyStopping(monitor="val_mae", min_delta=0.01, patience=3, verbose=False, mode="max")
+early_stop_callback = EarlyStopping(monitor="val_mae", min_delta=0.0, patience=5, verbose=True, mode="min")
 
 wandb_logger = WandbLogger(name='dyngesn',project='koopman')
 
 trainer = pl.Trainer(max_epochs=config.epochs,
-                     logger=wandb_logger,
-                     devices=1, 
-                     accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                     limit_train_batches=100,  # end an epoch after 100 updates
-                     callbacks=[checkpoint_callback, early_stop_callback],
-                     deterministic=True)
+                    logger=wandb_logger,
+                    devices=1, 
+                    accelerator="gpu" if torch.cuda.is_available() else "cpu",
+                    limit_train_batches=0.1, 
+                    limit_val_batches=0.1,
+                    #  limit_train_batches=100,  # end an epoch after 100 updates
+                    callbacks=[checkpoint_callback, early_stop_callback],
+                    deterministic=True)
 
 trainer.fit(predictor, train_dataloader=train_dataloader, val_dataloaders=val_dataloader)
