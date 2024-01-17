@@ -99,10 +99,10 @@ class _GraphRNN(torch.nn.Module):
             else:
                 h_out = h_out[-1]
 
-            out.append(h_out)
+            out.append(h)
         out = torch.stack(out)
-        # out: [steps, batch, nodes, channels]
-        out = rearrange(out, 's b n c -> b s n c')
+        # out: [steps, layers, batch, nodes, channels]
+        # out = rearrange(out, 's b n c -> b s n c')
         # h: [l b n c]
         return out, h
 

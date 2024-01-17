@@ -177,7 +177,7 @@ class DynGESNModel(nn.Module):
 
     def forward(self, x, edge_index, edge_weight):
         # x : [t n f]
-        # x = rearrange(x, 't n f -> 1 t n f')
+        x = rearrange(x, 't n f -> 1 t n f')
         edge_index, edge_weight = add_self_loops(edge_index, edge_weight)
         if not isinstance(edge_index, SparseTensor):
             num_nodes = None #x.shape[0]
@@ -188,5 +188,7 @@ class DynGESNModel(nn.Module):
         x, h = self.reservoir(x, edge_index)
 
         h = rearrange(h, 'l b n f -> b n (l f)')
+        x = rearrange(x, 's l b n f -> s n b l f')
 
-        return h # (batch, nodes, layers x reservoir_size)
+        # return h # (batch, nodes, layers x reservoir_size)
+        return x.squeeze(dim=2) # return all hidden states (steps, nodes, layers, reservoir_size)

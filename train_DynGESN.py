@@ -3,12 +3,8 @@ import wandb
 import torch.nn as nn
 import pytorch_lightning as pl
 import random
-import tsl
 import numpy as np
 
-from tsl.datasets import PvUS
-from tsl.data.datamodule import SpatioTemporalDataModule, TemporalSplitter
-from tsl.data.preprocessing import StandardScaler
 from tsl.metrics.torch import MaskedMAE
 from tsl.engines import Predictor
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -16,7 +12,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from einops import rearrange
 
-from models.DynGraphESN import DynGESNModel
+from dataset.utils import process_PVUS
 
 seed = 42
 random.seed(seed)
@@ -24,66 +20,28 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 pl.seed_everything(42)
 
-config = {
-    'window': 128,
-    'stride': 1,
-    'reservoir_size': 100,
-    'conv_steps': 52,
-    'input_scaling': 1.,
-    'num_layers': 1,
-    'leaking_rate': 0.9,
-    'spectral_radius': 0.9,
-    'density': 0.5,
-    'activation': 'tanh',
-    'epochs': 100,
-    'lr': 0.001
-}
-
-wandb.init(project="koopman", config=config)
-config = wandb.config
-
 if torch.cuda.is_available():
     device = torch.device('cuda')
 else:
     device = torch.device('cpu')
 
-dataset = PvUS(root="dataset", zones=['west'])
-sim = dataset.get_similarity("distance")
-connectivity = dataset.get_connectivity(threshold=0.1,
-                                        include_self=False,
-                                        normalize_axis=1,
-                                        layout="edge_index")
+config = {
+    'reservoir_size': 100,
+    'input_scaling': 1.,
+    'reservoir_layers': 1,
+    'leaking_rate': 0.9,
+    'spectral_radius': 0.9,
+    'density': 0.5,
+    'reservoir_activation': 'tanh',
+    'alpha_decay': False,
+    'epochs': 100,
+    'lr': 0.001
+}
 
-horizon = 24
-torch_dataset = tsl.data.SpatioTemporalDataset(target=dataset.dataframe(),
-                                      connectivity=connectivity,
-                                      mask=dataset.mask,
-                                      horizon=horizon,
-                                      window=config.window,
-                                      stride=config.stride)
+train_dataloader, test_dataloader, val_dataloader = process_PVUS(config, device, ignore_file=True, verbose=False)
 
-sample = torch_dataset[0].to(device)
-time_interval, num_nodes, feat_size = sample.input.x.shape
-
-scalers = {'target': StandardScaler(axis=(0, 1))}
-splitter = TemporalSplitter(val_len=0.1, test_len=0.2)
-dm = SpatioTemporalDataModule(
-    dataset=torch_dataset,
-    scalers=scalers,
-    splitter=splitter,
-    batch_size=1,
-)
-dm.setup()
-
-model = DynGESNModel(input_size=feat_size,
-                reservoir_size=config.reservoir_size,
-                input_scaling=config.input_scaling,
-                reservoir_layers=config.num_layers,
-                leaking_rate=config.leaking_rate,
-                spectral_radius=config.spectral_radius,
-                density=config.density,
-                reservoir_activation=config.activation,
-                alpha_decay=False).to(device)
+wandb.init(project="koopman", config=config)
+config = wandb.config
 
 class LinearRegression(pl.LightningModule):
     def __init__(self, encoder, input_size, output_size):
@@ -100,6 +58,8 @@ class LinearRegression(pl.LightningModule):
 
         return new_x
 
+model_file_path = "models/saved/DynGESN.pt"
+model = torch.load(model_file_path)
 forecaster = LinearRegression(model, input_size=config.reservoir_size*config.num_layers, output_size=feat_size*horizon).to(device)
 
 loss_fn = MaskedMAE()
@@ -133,4 +93,4 @@ trainer = pl.Trainer(max_epochs=config.epochs,
                      callbacks=[checkpoint_callback, early_stop_callback],
                      deterministic=True)
 
-trainer.fit(predictor, datamodule=dm)
+trainer.fit(predictor, train_dataloader=train_dataloader, val_dataloaders=val_dataloader)
