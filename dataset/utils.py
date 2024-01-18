@@ -28,7 +28,7 @@ class H5Dataset(torch.utils.data.Dataset):
         input_data = torch.from_numpy(self.inputs[index])
         target_data = torch.from_numpy(self.targets[index])
         sample = {'x': input_data, 'y': target_data}
-        return sample
+        return input_data, target_data
     
 
 def run_dyn_gesn(file_path, threshold, config, device, zones=['west'], freq='H', verbose=False):
@@ -90,19 +90,20 @@ def run_dyn_gesn(file_path, threshold, config, device, zones=['west'], freq='H',
     for i, sample in enumerate(tqdm(torch_dataset)):
         sample = sample.to(device)
         output = model(sample.input.x, sample.input.edge_index, sample.input.edge_weight)
-        inputs.append(output.detach().cpu()[:,:-1,:])
+        inputs.append(output.detach().cpu())
         labels.append(sample.target.y.detach().cpu())
 
     if verbose:
         print("DynGESN model run complete.")
 
+    # Save the torch_dataset to the H5 file
+    if verbose:
+        print("Saving results to H5 file...")
+
     inputs = torch.stack(inputs, dim=0).squeeze()
     inputs = rearrange(inputs, 'b n l f -> b n (l f)')
     labels = torch.stack(labels, dim=0)[:, -1, :, :]
 
-    # Save the torch_dataset to the H5 file
-    if verbose:
-        print("Saving results to H5 file...")
     with h5py.File(file_path, "w") as h5_file:
         h5_file.create_dataset("input", data=inputs)
         h5_file.create_dataset("label", data=labels)
@@ -138,26 +139,22 @@ def process_PVUS(config, device, threshold=0.7, train_ratio=0.7, test_ratio=0.2,
         run_dyn_gesn(file_path, threshold, config, device, zones, freq, verbose=verbose)
     
     dataset = H5Dataset(file_path, "input", "label")
-
-    data = []
-    with h5py.File(file_path, "r") as h5_file:
-        num_samples = len(h5_file['input'])
-        for i in range(num_samples):
-            data.append([h5_file['input'][i], h5_file['label'][i]])
     
     # Calculate the number of samples for each split
     num_samples = len(dataset)
     train_size = int(train_ratio * num_samples)
     test_size = int(test_ratio * num_samples)
 
-    data = [[s['x'],s['y']] for s in dataset]
-
     # Define the dataloaders for each subset
-    train_dataloader = DataLoader(data[:train_size], batch_size=batch_size, shuffle=False)
-    test_dataloader = DataLoader(data[train_size:train_size+test_size], batch_size=batch_size, shuffle=False)
-    val_dataloader = DataLoader(data[train_size+test_size:], batch_size=batch_size, shuffle=False)
+    train_dataset = torch.utils.data.Subset(dataset, list(range(train_size)))
+    val_dataset = torch.utils.data.Subset(dataset, list(range(train_size, num_samples-test_size)))
+    test_dataset = torch.utils.data.Subset(dataset, list(range(num_samples-test_size, num_samples)))
+    
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return dataset, train_dataloader, test_dataloader, val_dataloader
+    return train_dataloader, test_dataloader, val_dataloader
 
 
 
