@@ -46,7 +46,9 @@ def run_dyn_gesn(file_path, threshold, config, device, zones=['west'], freq='H',
     """
 
     dataset = PvUS(root="dataset/pv_us", zones=zones, freq=freq)
-    sim = dataset.get_similarity("distance")  # or dataset.compute_similarity()
+    node_index = [i for i in range(0, 200)]
+    dataset = dataset.reduce(node_index=node_index)
+    sim = dataset.get_similarity("distance")
     connectivity = dataset.get_connectivity(threshold=threshold,
                                             include_self=False,
                                             normalize_axis=1,
@@ -89,7 +91,7 @@ def run_dyn_gesn(file_path, threshold, config, device, zones=['west'], freq='H',
 
     for i, sample in enumerate(tqdm(torch_dataset)):
         sample = sample.to(device)
-        output = model(sample.input.x, sample.input.edge_index, sample.input.edge_weight)
+        output = model(sample.input.x, sample.input.edge_index, sample.input.edge_weight)[:,:,-1,:]
         inputs.append(output.detach().cpu())
         labels.append(sample.target.y.detach().cpu())
 
@@ -101,7 +103,7 @@ def run_dyn_gesn(file_path, threshold, config, device, zones=['west'], freq='H',
         print("Saving results to H5 file...")
 
     inputs = torch.stack(inputs, dim=0).squeeze()
-    inputs = rearrange(inputs, 'b n l f -> b n (l f)')
+    inputs = rearrange(inputs, 'b n f -> b n f')
     labels = torch.stack(labels, dim=0)[:, -1, :, :]
 
     with h5py.File(file_path, "w") as h5_file:
