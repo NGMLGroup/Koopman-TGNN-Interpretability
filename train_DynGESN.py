@@ -5,12 +5,9 @@ import pytorch_lightning as pl
 import random
 import numpy as np
 
-from tsl.metrics.torch import MaskedMAE
-from tsl.engines import Predictor
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
-from einops import rearrange
 
 from dataset.utils import process_PVUS
 
@@ -39,10 +36,10 @@ config = {
     'lr': 0.001
 }
 
-train_dataloader, test_dataloader, val_dataloader = process_PVUS(config, device, ignore_file=True, verbose=False)
-
 wandb.init(project="koopman", config=config)
 config = wandb.config
+
+train_dataloader, test_dataloader, val_dataloader = process_PVUS(config, device, ignore_file=True, verbose=False)
 
 class LinearRegression(pl.LightningModule):
     def __init__(self, input_size, output_size):
@@ -75,7 +72,7 @@ class LinearRegression(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=0.07)
         return optimizer
 
-forecaster = LinearRegression(input_size=config.reservoir_size*config.num_layers, output_size=1).to(device)
+forecaster = LinearRegression(input_size=config.reservoir_size, output_size=1).to(device)
 
 checkpoint_callback = ModelCheckpoint(
     dirpath='logs',
@@ -83,7 +80,7 @@ checkpoint_callback = ModelCheckpoint(
     monitor='val_loss',
     mode='min',
 )
-early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.0, patience=5, verbose=True, mode="min")
+early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.005, patience=5, verbose=True, mode="min")
 
 wandb_logger = WandbLogger(name='dyngesn',project='koopman')
 
@@ -95,6 +92,7 @@ trainer = pl.Trainer(max_epochs=config.epochs,
                     # limit_val_batches=0.1,
                     # limit_train_batches=100,  # end an epoch after 100 updates
                     callbacks=[checkpoint_callback, early_stop_callback],
-                    deterministic=True)
+                    # deterministic=True
+                    )
 
-trainer.fit(model=forecaster, train_dataloader=train_dataloader, val_dataloaders=val_dataloader)
+trainer.fit(model=forecaster, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
