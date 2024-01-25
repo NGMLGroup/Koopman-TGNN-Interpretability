@@ -1,0 +1,9 @@
+# graphs: 995
+# class 0: 497
+# class 1: 498
+min. # nodes: 71
+max. # nodes: 100
+avg. # nodes: 95.7226
+min. # edges: 176
+max. # edges: 362
+avg. # edges: 269.018
