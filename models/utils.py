@@ -81,6 +81,7 @@ class _GraphRNN(torch.nn.Module):
     def forward(self, x, *args, h=None, **kwargs):
         # x: [batch, steps, nodes, channels]
         steps = x.size(1)
+        edge_index, edge_weight = args
         if h is None:
             *h, = self._init_states(x)
         if not len(h):
@@ -88,7 +89,11 @@ class _GraphRNN(torch.nn.Module):
         # temporal conv
         out = []
         for step in range(steps):
-            h = self.single_pass(x[:, step], h, *args, **kwargs)
+            if isinstance(edge_index, list):
+                edge_index = edge_index[step]
+                if edge_weight is not None:
+                    edge_weight = edge_weight[step]
+            h = self.single_pass(x[:, step], h, edge_index, edge_weight, **kwargs)
             if not isinstance(h, torch.Tensor):
                 h_out, _ = h
             else:

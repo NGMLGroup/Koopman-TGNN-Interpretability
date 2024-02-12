@@ -93,10 +93,14 @@ class GESNLayer(MessagePassing):
     def forward(self, x, h, edge_index, edge_weight=None):
         """This layer expects a normalized adjacency matrix either in
         edge_index or SparseTensor layout."""
-        h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
-                                self.propagate(edge_index,
-                                               x=F.linear(h, self.w_hh),
-                                               edge_weight=edge_weight))
+        if edge_index.numel() == 0:
+            # no edges
+            h_new = self.activation(F.linear(x, self.w_ih, self.b_ih))
+        else:
+            h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
+                                    self.propagate(edge_index,
+                                                x=F.linear(h, self.w_hh),
+                                                edge_weight=edge_weight))
         h_new = (1 - self.alpha) * h + self.alpha * h_new
         return h_new
 
@@ -176,6 +180,13 @@ class DynGESNModel(nn.Module):
                                   alpha_decay=alpha_decay)
 
     def forward(self, x, edge_index, edge_weight):
+        if not isinstance(edge_index, list):
+            return self.forward_tensor(x, edge_index, edge_weight)
+        else:
+            return self.forward_list(x, edge_index, edge_weight)
+    
+
+    def forward_tensor(self, x, edge_index, edge_weight):
         # x : [t n f]
         x = rearrange(x, 't n f -> 1 t n f')
         edge_index, edge_weight = add_self_loops(edge_index, edge_weight)
@@ -191,4 +202,15 @@ class DynGESNModel(nn.Module):
         x = rearrange(x, 's l b n f -> s n b l f')
 
         # return h # (batch, nodes, layers x reservoir_size)
+        return x.squeeze(dim=2) # return all hidden states (steps, nodes, layers, reservoir_size)
+    
+
+    def forward_list(self, x, edge_index, edge_weight):
+        # x : [t n f]
+        x = rearrange(x, 't n f -> 1 t n f')
+        x, h = self.reservoir(x, edge_index, edge_weight)
+
+        h = rearrange(h, 'l b n f -> b n (l f)')
+        x = rearrange(x, 's l b n f -> s n b l f')
+
         return x.squeeze(dim=2) # return all hidden states (steps, nodes, layers, reservoir_size)
