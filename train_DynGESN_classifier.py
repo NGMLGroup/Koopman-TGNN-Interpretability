@@ -65,6 +65,8 @@ class LinearRegression(pl.LightningModule):
         output = self.forward(x)
         loss = nn.BCEWithLogitsLoss()(output, y.float())
         self.log('val_loss', loss)
+        self.accuracy(output, y)
+        self.log('val_acc_step', self.accuracy)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -72,7 +74,7 @@ class LinearRegression(pl.LightningModule):
         loss = nn.BCEWithLogitsLoss()(output, y.float())
         self.log('test_loss', loss)
         self.accuracy(output, y)
-        self.log('train_acc_step', self.accuracy)
+        self.log('test_acc_step', self.accuracy)
         
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
@@ -86,7 +88,7 @@ checkpoint_callback = ModelCheckpoint(
     monitor='val_loss',
     mode='min',
 )
-early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.005, patience=5, verbose=True, mode="min")
+early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.005, patience=10, verbose=True, mode="min")
 
 wandb_logger = WandbLogger(name='dyngesn',project='koopman')
 
