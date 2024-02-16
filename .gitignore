@@ -16,6 +16,7 @@ wandb
 *.gexf
 *.gephi
 *.h5
+plots/graphs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
