@@ -34,13 +34,14 @@ config = {
     'reservoir_activation': 'tanh',
     'alpha_decay': False,
     'epochs': 100,
-    'lr': 0.001
+    'lr': 0.001,
+    'skip_disconnected': False
 }
 
 wandb.init(project="koopman", config=config)
 config = wandb.config
 
-train_dataloader, test_dataloader, val_dataloader = process_FB(config, device, ignore_file=True, verbose=True)
+train_dataloader, test_dataloader, val_dataloader, _ = process_FB(config, device, ignore_file=True, verbose=True)
 
 class LinearRegression(pl.LightningModule):
     def __init__(self, input_size, output_size):

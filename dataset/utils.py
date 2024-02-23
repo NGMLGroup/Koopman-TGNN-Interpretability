@@ -245,7 +245,8 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
                             spectral_radius=config['spectral_radius'],
                             density=config['density'],
                             reservoir_activation=config['reservoir_activation'],
-                            alpha_decay=config['alpha_decay']).to(device)
+                            alpha_decay=config['alpha_decay'],
+                            skip_disconnected=config['skip_disconnected']).to(device)
 
     # Save the model to a file
     model_file_path = "models/saved/DynGESN.pt"
@@ -255,6 +256,7 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
 
     inputs = []
     labels = []
+    states = []
 
     if verbose:
         print("Running DynGESN model...")
@@ -265,6 +267,7 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
                     edge_index=edge_indexes[n]).to(device)
         output = model(sample.input.x, sample.edge_index, None)[:,:,-1,:]
         inputs.append(output.detach().cpu().sum(dim=1)[-1,:])
+        states.append(output.detach().cpu().sum(dim=1))
         labels.append(sample.target.y.detach().cpu())
 
     if verbose:
@@ -275,11 +278,21 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
         print("Saving results to H5 file...")
 
     inputs = torch.stack(inputs, dim=0).squeeze()
-    # inputs = rearrange(inputs, 'b n f -> b n f')
+    states = torch.stack(states, dim=0).squeeze()
     labels = torch.stack(labels, dim=0)
 
-    with h5py.File(file_path, "w") as h5_file:
+    if not os.path.exists(file_path + "dataset.h5"):
+        os.makedirs(file_path + "dataset.h5")
+
+    with h5py.File(file_path + "dataset.h5", "w") as h5_file:
         h5_file.create_dataset("input", data=inputs)
+        h5_file.create_dataset("label", data=labels)
+
+    if not os.path.exists(file_path + "states.h5"):
+        os.makedirs(file_path + "states.h5")
+
+    with h5py.File(file_path + "states.h5", "w") as h5_file:
+        h5_file.create_dataset("states", data=states)
         h5_file.create_dataset("label", data=labels)
     
     if verbose:
@@ -289,12 +302,13 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
 def process_FB(config, device, train_ratio=0.7, test_ratio=0.2, batch_size=32, ignore_file=True, verbose=False):
 
     # Specify the path to the H5 file
-    file_path = "dataset/facebook_ct1/processed/states.h5"
+    file_path = "dataset/facebook_ct1/processed/"
 
-    if not os.path.exists(file_path) or ignore_file:
+    if not os.path.exists(file_path + "dataset.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
         run_dyn_gesn_FB(file_path, config, device, verbose=verbose)
     
-    dataset = H5Dataset(file_path, "input", "label")
+    dataset = H5Dataset(file_path + "dataset.h5", "input", "label")
+    states = H5Dataset(file_path + "states.h5", "states", "label")
     
     # Calculate the number of samples for each split
     num_samples = len(dataset)
@@ -310,4 +324,4 @@ def process_FB(config, device, train_ratio=0.7, test_ratio=0.2, batch_size=32, i
     test_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     val_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_dataloader, test_dataloader, val_dataloader
+    return train_dataloader, test_dataloader, val_dataloader, states

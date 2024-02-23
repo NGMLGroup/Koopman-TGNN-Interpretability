@@ -35,7 +35,8 @@ class GESNLayer(MessagePassing):
                  in_scaling=1.,
                  bias_scale=1.,
                  activation='tanh',
-                 aggr='add'):
+                 aggr='add',
+                 skip_disconnected=True):
         super(GESNLayer, self).__init__(aggr=aggr)
         self.w_ih_scale = in_scaling
         self.b_scale = bias_scale
@@ -43,6 +44,7 @@ class GESNLayer(MessagePassing):
         self.hidden_size = hidden_size
         self.alpha = leaking_rate
         self.spectral_radius = spectral_radius
+        self.skip_disconnected = skip_disconnected
 
         assert activation in ['tanh', 'relu', 'self_norm', 'identity']
         if activation == 'self_norm':
@@ -95,7 +97,10 @@ class GESNLayer(MessagePassing):
         edge_index or SparseTensor layout."""
         if edge_index.numel() == 0:
             # no edges
-            h_new = self.activation(F.linear(x, self.w_ih, self.b_ih))
+            if self.skip_disconnected:
+                return h
+            else:
+                h_new = self.activation(F.linear(x, self.w_ih, self.b_ih))
         else:
             h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
                                     self.propagate(edge_index,
@@ -118,7 +123,8 @@ class DynGraphESN(_GraphRNN):
                  density=0.9,
                  activation='tanh',
                  bias=True,
-                 alpha_decay=False):
+                 alpha_decay=False,
+                 skip_disconnected=True):
         super(DynGraphESN, self).__init__()
         self.mode = activation
         self.input_size = input_size
@@ -142,7 +148,8 @@ class DynGraphESN(_GraphRNN):
                     density=density,
                     activation=activation,
                     spectral_radius=spectral_radius,
-                    leaking_rate=alpha
+                    leaking_rate=alpha,
+                    skip_disconnected=skip_disconnected,
                 ))
             if self.alpha_decay:
                 alpha = np.clip(alpha - 0.1, 0.1, 1.)
@@ -166,7 +173,8 @@ class DynGESNModel(nn.Module):
                  density,
                  input_scaling,
                  alpha_decay,
-                 reservoir_activation='tanh'
+                 skip_disconnected,
+                 reservoir_activation='tanh',
                  ):
         super(DynGESNModel, self).__init__()
         self.reservoir = DynGraphESN(input_size=input_size,
@@ -177,7 +185,8 @@ class DynGESNModel(nn.Module):
                                   spectral_radius=spectral_radius,
                                   density=density,
                                   activation=reservoir_activation,
-                                  alpha_decay=alpha_decay)
+                                  alpha_decay=alpha_decay,
+                                  skip_disconnected=skip_disconnected)
 
     def forward(self, x, edge_index, edge_weight):
         if not isinstance(edge_index, list):
@@ -206,6 +215,9 @@ class DynGESNModel(nn.Module):
     
 
     def forward_list(self, x, edge_index, edge_weight):
+        # To be used when edge_index changes with time
+        # - edge_index: list of edge_index for each time step
+
         # x : [t n f]
         x = rearrange(x, 't n f -> 1 t n f')
         x, h = self.reservoir(x, edge_index, edge_weight)
