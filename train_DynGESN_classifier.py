@@ -34,8 +34,7 @@ config = {
     'reservoir_activation': 'tanh',
     'alpha_decay': False,
     'epochs': 100,
-    'lr': 0.001,
-    'skip_disconnected': False
+    'lr': 0.001
 }
 
 wandb.init(project="koopman", config=config)

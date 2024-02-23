@@ -35,8 +35,7 @@ class GESNLayer(MessagePassing):
                  in_scaling=1.,
                  bias_scale=1.,
                  activation='tanh',
-                 aggr='add',
-                 skip_disconnected=True):
+                 aggr='add'):
         super(GESNLayer, self).__init__(aggr=aggr)
         self.w_ih_scale = in_scaling
         self.b_scale = bias_scale
@@ -44,7 +43,6 @@ class GESNLayer(MessagePassing):
         self.hidden_size = hidden_size
         self.alpha = leaking_rate
         self.spectral_radius = spectral_radius
-        self.skip_disconnected = skip_disconnected
 
         assert activation in ['tanh', 'relu', 'self_norm', 'identity']
         if activation == 'self_norm':
@@ -87,7 +85,7 @@ class GESNLayer(MessagePassing):
         self.w_hh.data.mul_(self.spectral_radius / torch.max(abs_eigs))
 
     def message(self, x_j, edge_weight):
-        return edge_weight.view(-1, 1) * x_j if edge_weight else x_j
+        return edge_weight.view(-1, 1) * x_j if edge_weight is not None else x_j
 
     def message_and_aggregate(self, adj_t, x):
         return torch_sparse.matmul(adj_t, x, reduce=self.aggr)
@@ -95,18 +93,16 @@ class GESNLayer(MessagePassing):
     def forward(self, x, h, edge_index, edge_weight=None):
         """This layer expects a normalized adjacency matrix either in
         edge_index or SparseTensor layout."""
-        if edge_index.numel() == 0:
-            # no edges
-            if self.skip_disconnected:
-                return h
-            else:
-                h_new = self.activation(F.linear(x, self.w_ih, self.b_ih))
-        else:
-            h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
-                                    self.propagate(edge_index,
-                                                x=F.linear(h, self.w_hh),
-                                                edge_weight=edge_weight))
+        
+        if edge_weight is None:
+            edge_weight = torch.ones(edge_index.size(1), device=edge_index.device)
+
+        h_new = self.activation(F.linear(x, self.w_ih, self.b_ih) +
+                                self.propagate(edge_index,
+                                            x=F.linear(h, self.w_hh),
+                                            edge_weight=edge_weight))
         h_new = (1 - self.alpha) * h + self.alpha * h_new
+
         return h_new
 
 
@@ -123,8 +119,7 @@ class DynGraphESN(_GraphRNN):
                  density=0.9,
                  activation='tanh',
                  bias=True,
-                 alpha_decay=False,
-                 skip_disconnected=True):
+                 alpha_decay=False):
         super(DynGraphESN, self).__init__()
         self.mode = activation
         self.input_size = input_size
@@ -148,8 +143,7 @@ class DynGraphESN(_GraphRNN):
                     density=density,
                     activation=activation,
                     spectral_radius=spectral_radius,
-                    leaking_rate=alpha,
-                    skip_disconnected=skip_disconnected,
+                    leaking_rate=alpha
                 ))
             if self.alpha_decay:
                 alpha = np.clip(alpha - 0.1, 0.1, 1.)
@@ -173,7 +167,6 @@ class DynGESNModel(nn.Module):
                  density,
                  input_scaling,
                  alpha_decay,
-                 skip_disconnected,
                  reservoir_activation='tanh',
                  ):
         super(DynGESNModel, self).__init__()
@@ -185,8 +178,7 @@ class DynGESNModel(nn.Module):
                                   spectral_radius=spectral_radius,
                                   density=density,
                                   activation=reservoir_activation,
-                                  alpha_decay=alpha_decay,
-                                  skip_disconnected=skip_disconnected)
+                                  alpha_decay=alpha_decay)
 
     def forward(self, x, edge_index, edge_weight):
         if not isinstance(edge_index, list):

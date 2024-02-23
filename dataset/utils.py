@@ -9,6 +9,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from einops import rearrange
 from numpy import loadtxt, ndarray
+from torch_geometric.utils import add_self_loops
 
 
 
@@ -216,6 +217,7 @@ def load_FB():
     node_labels = [node_label[:, graph_idx == i,:] for i in range(1, num_graphs + 1)]
 
     edge_index = (A.T - 1).int()
+    edge_index, edge_attr = add_self_loops(edge_index, edge_attr, fill_value=timesteps)
 
     # Split edge index and edge attributes based on graph index
     num_nodes_per_graph = torch.cumsum(torch.cat([torch.tensor([0]), torch.unique(graph_idx, return_counts=True)[1]]), dim=0)
@@ -245,8 +247,7 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
                             spectral_radius=config['spectral_radius'],
                             density=config['density'],
                             reservoir_activation=config['reservoir_activation'],
-                            alpha_decay=config['alpha_decay'],
-                            skip_disconnected=config['skip_disconnected']).to(device)
+                            alpha_decay=config['alpha_decay']).to(device)
 
     # Save the model to a file
     model_file_path = "models/saved/DynGESN.pt"
@@ -265,7 +266,8 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
         sample = tsl.data.data.Data(input={'x': node_labels[n]},
                     target={'y': graph_labels[n]},
                     edge_index=edge_indexes[n]).to(device)
-        output = model(sample.input.x, sample.edge_index, None)[:,:,-1,:]
+        output = model(sample.input.x, sample.edge_index, None)
+        output = rearrange(output, 't n l f -> t n (l f)')
         inputs.append(output.detach().cpu().sum(dim=1)[-1,:])
         states.append(output.detach().cpu().sum(dim=1))
         labels.append(sample.target.y.detach().cpu())
