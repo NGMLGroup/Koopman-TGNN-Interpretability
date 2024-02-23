@@ -80,7 +80,7 @@ class LinearRegression(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=config.lr)
         return optimizer
 
-forecaster = LinearRegression(input_size=config.reservoir_size, output_size=1).to(device)
+forecaster = LinearRegression(input_size=config.reservoir_size*config.reservoir_layers, output_size=1).to(device)
 
 checkpoint_callback = ModelCheckpoint(
     dirpath='logs',
