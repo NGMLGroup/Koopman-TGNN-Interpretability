@@ -164,7 +164,7 @@ def process_PVUS(config, device, threshold=0.7, train_ratio=0.7, test_ratio=0.2,
     return train_dataloader, test_dataloader, val_dataloader
 
 
-def load_FB():
+def load_FB(b_add_self_loops=True):
     # Specify the folder path
     folder_path = "dataset/facebook_ct1/"
 
@@ -217,7 +217,8 @@ def load_FB():
     node_labels = [node_label[:, graph_idx == i,:] for i in range(1, num_graphs + 1)]
 
     edge_index = (A.T - 1).int()
-    edge_index, edge_attr = add_self_loops(edge_index, edge_attr, fill_value=timesteps)
+    if b_add_self_loops:
+        edge_index, edge_attr = add_self_loops(edge_index, edge_attr, fill_value=timesteps)
 
     # Split edge index and edge attributes based on graph index
     num_nodes_per_graph = torch.cumsum(torch.cat([torch.tensor([0]), torch.unique(graph_idx, return_counts=True)[1]]), dim=0)
@@ -235,7 +236,7 @@ def load_FB():
 
 def run_dyn_gesn_FB(file_path, config, device, verbose=False):
     # Load dataset
-    edge_indexes, node_labels, graph_labels = load_FB()
+    edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
 
     # Define the model
     feat_size = 1
@@ -247,7 +248,8 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
                             spectral_radius=config['spectral_radius'],
                             density=config['density'],
                             reservoir_activation=config['reservoir_activation'],
-                            alpha_decay=config['alpha_decay']).to(device)
+                            alpha_decay=config['alpha_decay'],
+                            b_leaking_rate=config['b_leaking_rate']).to(device)
 
     # Save the model to a file
     model_file_path = "models/saved/DynGESN.pt"

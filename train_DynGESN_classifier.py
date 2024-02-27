@@ -30,11 +30,13 @@ config = {
     'reservoir_layers': 1,
     'leaking_rate': 0.9,
     'spectral_radius': 0.9,
-    'density': 0.5,
+    'density': 1,
     'reservoir_activation': 'tanh',
     'alpha_decay': False,
     'epochs': 100,
-    'lr': 0.001
+    'lr': 0.001,
+    'add_self_loops': False,
+    'b_leaking_rate': True,
 }
 
 wandb.init(project="koopman", config=config)
