@@ -2,6 +2,7 @@ import torch
 import tsl
 import h5py
 import os
+import scipy.io
 
 from tsl.datasets import PvUS
 from models.DynGraphESN import DynGESNModel
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 from einops import rearrange
 from numpy import loadtxt, ndarray
 from torch_geometric.utils import add_self_loops
+from torch_geometric.utils.convert import from_scipy_sparse_matrix
 
 
 
@@ -232,6 +234,39 @@ def load_FB(b_add_self_loops=True):
         edge_indexes.append([edge_index[:, edge_attr == t] for t in range(1, timesteps+1)])
     
     return edge_indexes, node_labels, graph_labels
+
+
+def load_FB2(b_add_self_loops=True):
+    # Specify the path to the .mat file
+    adj_file_path = "dataset/facebook_ct1/adjoint.mat"
+    feat_file_path = "dataset/facebook_ct1/feature.mat"
+    label_file_path = "dataset/facebook_ct1/label.mat"
+
+    # Load the .mat file
+    adj_data = scipy.io.loadmat(adj_file_path)
+    feat_data = scipy.io.loadmat(feat_file_path)
+    label_data = scipy.io.loadmat(label_file_path)
+
+    # Access the variables in the .mat file
+    A = adj_data['A']
+    features = feat_data['u']
+    labels = label_data['y']
+
+    edge_indexes = []
+    for g in len(A):
+        e_graph = []
+        f_graph = []
+        y_graph = []
+        for t in len(A[g]):
+            edge_index, _ = from_scipy_sparse_matrix(A[g][t])
+            e_graph.append(edge_index)
+            f_graph.append(features[g][t])
+            y_graph.append(labels[g][t])
+        edge_indexes.append(e_graph)
+        f_graph
+
+
+
 
 
 def run_dyn_gesn_FB(file_path, config, device, verbose=False):
