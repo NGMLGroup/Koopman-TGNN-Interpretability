@@ -271,9 +271,9 @@ def load_FB2(b_add_self_loops=True):
         node_f = rearrange(node_f, 't f n -> t n f')
         node_labels.append(node_f) # g, t, n, 1
 
-    graph_labels = torch.from_numpy(labels).squeeze() # tensor (G)
+    graph_labels = (torch.from_numpy(labels).squeeze() + 1) / 2 # tensor (G)
 
-    return edge_indexes, node_labels, graph_labels
+    return edge_indexes, node_labels, graph_labels.float()
 
 
 def run_dyn_gesn_FB(file_path, config, device, verbose=False):
