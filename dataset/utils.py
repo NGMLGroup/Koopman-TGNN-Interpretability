@@ -224,8 +224,8 @@ def load_FB(b_add_self_loops=True):
 
     # Split edge index and edge attributes based on graph index
     num_nodes_per_graph = torch.cumsum(torch.cat([torch.tensor([0]), torch.unique(graph_idx, return_counts=True)[1]]), dim=0)
-    edge_index_split = [(edge_index[:, (graph_idx[edge_index[0,:]].int() - 1) == i] - num_nodes_per_graph[i]).long() for i in range(0, num_graphs)]
-    edge_attr_split = [edge_attr[(graph_idx[edge_index[0,:]].int() - 1) == i] for i in range(0, num_graphs)]
+    edge_index_split = [(edge_index[:, (graph_idx[edge_index[0,:].long()].int() - 1) == i] - num_nodes_per_graph[i]).long() for i in range(0, num_graphs)]
+    edge_attr_split = [edge_attr[(graph_idx[edge_index[0,:].long()].int() - 1) == i] for i in range(0, num_graphs)]
 
     edge_indexes = []
 
@@ -252,26 +252,34 @@ def load_FB2(b_add_self_loops=True):
     features = feat_data['u']
     labels = label_data['y']
 
-    edge_indexes = []
-    for g in len(A):
+    edge_indexes = [] # list (G) of list (T) of tensors (2, E)
+    node_labels = [] # list (G) of tensors (T, N, F)
+
+    for g in range(len(A)):
         e_graph = []
         f_graph = []
-        y_graph = []
-        for t in len(A[g]):
+        
+        for t in range(len(A[g])):
             edge_index, _ = from_scipy_sparse_matrix(A[g][t])
+            if b_add_self_loops:
+                edge_index, _ = add_self_loops(edge_index, None)
             e_graph.append(edge_index)
-            f_graph.append(features[g][t])
-            y_graph.append(labels[g][t])
+            f_graph.append(torch.from_numpy(features[g][t].toarray()))
+            
         edge_indexes.append(e_graph)
-        f_graph
+        node_f = torch.stack(f_graph, dim=0).float()
+        node_f = rearrange(node_f, 't f n -> t n f')
+        node_labels.append(node_f) # g, t, n, 1
 
+    graph_labels = torch.from_numpy(labels).squeeze() # tensor (G)
 
-
+    return edge_indexes, node_labels, graph_labels
 
 
 def run_dyn_gesn_FB(file_path, config, device, verbose=False):
     # Load dataset
-    edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
+    # edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
+    edge_indexes, node_labels, graph_labels = load_FB2(config['add_self_loops'])
 
     # Define the model
     feat_size = 1
