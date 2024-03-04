@@ -64,15 +64,15 @@ class GESNLayer(MessagePassing):
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.w_ih.data.uniform_(0, 1) # it was -1, 1
+        self.w_ih.data.uniform_(-1, 1)
         self.w_ih.data.mul_(self.w_ih_scale)
 
         if self.b_ih is not None:
-            self.b_ih.data.uniform_(0, 1) # it was -1, 1
+            self.b_ih.data.uniform_(-1, 1)
             self.b_ih.data.mul_(self.b_scale)
 
         # init recurrent weights
-        self.w_hh.data.uniform_(0, 1) # it was -1, 1
+        self.w_hh.data.uniform_(-1, 1)
 
         if self.density < 1:
             n_units = self.hidden_size * self.hidden_size

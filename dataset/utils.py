@@ -278,8 +278,8 @@ def load_FB2(b_add_self_loops=True):
 
 def run_dyn_gesn_FB(file_path, config, device, verbose=False):
     # Load dataset
-    # edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
-    edge_indexes, node_labels, graph_labels = load_FB2(config['add_self_loops'])
+    edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
+    # edge_indexes, node_labels, graph_labels = load_FB2(config['add_self_loops'])
 
     # Define the model
     feat_size = 1
