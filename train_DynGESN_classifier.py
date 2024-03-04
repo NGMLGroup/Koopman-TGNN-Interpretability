@@ -25,17 +25,17 @@ else:
     device = torch.device('cpu')
 
 config = {
-    'reservoir_size': 100,
-    'input_scaling': 1.,
-    'reservoir_layers': 1,
-    'leaking_rate': 0.9,
-    'spectral_radius': 0.9,
-    'density': 1,
+    'reservoir_size': 174,
+    'input_scaling': 0.86,
+    'reservoir_layers': 8,
+    'leaking_rate': 0.21,
+    'spectral_radius': 4.49,
+    'density': 0.67,
     'reservoir_activation': 'tanh',
-    'alpha_decay': False,
+    'alpha_decay': True,
+    'lr': 0.066,
     'epochs': 100,
-    'lr': 0.001,
-    'add_self_loops': False,
+    'add_self_loops': True,
     'b_leaking_rate': True,
 }
 
@@ -106,3 +106,6 @@ trainer = pl.Trainer(max_epochs=config.epochs,
                     )
 
 trainer.fit(model=forecaster, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+
+test_loss, test_acc = trainer.test(model=forecaster, dataloaders=val_dataloader)[0]
+print("Test Loss: ", test_loss, "Test Accuracy: ", test_acc)
