@@ -30,7 +30,7 @@ class GESNLayer(MessagePassing):
                  hidden_size,
                  spectral_radius=0.9,
                  leaking_rate=0.9,
-                 bias=False,
+                 bias=True,
                  density=0.9,
                  in_scaling=1.,
                  bias_scale=1.,
