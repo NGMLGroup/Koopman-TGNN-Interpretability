@@ -203,7 +203,7 @@ def load_FB(b_add_self_loops=True):
 
     lines = [list(map(int, line.strip().split(','))) for line in lines]
 
-    timesteps = 105
+    timesteps = 106
 
     node_label = torch.zeros((timesteps, num_nodes, 1))
 
