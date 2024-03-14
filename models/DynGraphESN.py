@@ -36,7 +36,8 @@ class GESNLayer(MessagePassing):
                  bias_scale=1.,
                  activation='tanh',
                  aggr='add',
-                 b_leaking_rate=True):
+                 b_leaking_rate=True,
+                 requires_grad=False):
         super(GESNLayer, self).__init__(aggr=aggr)
         self.w_ih_scale = in_scaling
         self.b_scale = bias_scale
@@ -53,12 +54,12 @@ class GESNLayer(MessagePassing):
             self.activation = get_functional_activation(activation)
 
         self.w_ih = nn.Parameter(torch.Tensor(hidden_size, input_size),
-                                 requires_grad=False)
+                                 requires_grad=requires_grad)
         self.w_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size),
-                                 requires_grad=False)
+                                 requires_grad=requires_grad)
         if bias is not None:
             self.b_ih = nn.Parameter(torch.Tensor(hidden_size),
-                                     requires_grad=False)
+                                     requires_grad=requires_grad)
         else:
             self.register_parameter('b_ih', None)
         self.reset_parameters()
@@ -131,7 +132,8 @@ class DynGraphESN(_GraphRNN):
                  activation='tanh',
                  bias=True,
                  alpha_decay=False,
-                 b_leaking_rate=True):
+                 b_leaking_rate=True,
+                 requires_grad=False):
         super(DynGraphESN, self).__init__()
         self.mode = activation
         self.input_size = input_size
@@ -156,7 +158,8 @@ class DynGraphESN(_GraphRNN):
                     activation=activation,
                     spectral_radius=spectral_radius,
                     leaking_rate=alpha,
-                    b_leaking_rate=b_leaking_rate
+                    b_leaking_rate=b_leaking_rate,
+                    requires_grad=requires_grad
                 ))
             if self.alpha_decay:
                 alpha = np.clip(alpha - 0.1, 0.1, 1.)
@@ -181,7 +184,8 @@ class DynGESNModel(nn.Module):
                  input_scaling,
                  alpha_decay,
                  reservoir_activation='tanh',
-                 b_leaking_rate=True
+                 b_leaking_rate=True,
+                 requires_grad=False
                  ):
         super(DynGESNModel, self).__init__()
         self.reservoir = DynGraphESN(input_size=input_size,
@@ -193,7 +197,8 @@ class DynGESNModel(nn.Module):
                                   density=density,
                                   activation=reservoir_activation,
                                   alpha_decay=alpha_decay,
-                                  b_leaking_rate=b_leaking_rate)
+                                  b_leaking_rate=b_leaking_rate,
+                                  requires_grad=requires_grad)
 
     def forward(self, x, edge_index, edge_weight):
         if not isinstance(edge_index, list):

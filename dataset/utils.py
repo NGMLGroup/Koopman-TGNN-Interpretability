@@ -368,7 +368,7 @@ def process_FB(config, device, train_ratio=0.7, test_ratio=0.2, batch_size=32, i
     test_dataset = torch.utils.data.Subset(dataset, list(range(num_samples-test_size, num_samples)))
     
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    test_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    val_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     return train_dataloader, test_dataloader, val_dataloader, states
