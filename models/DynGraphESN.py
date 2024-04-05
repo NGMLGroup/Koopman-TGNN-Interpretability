@@ -217,7 +217,7 @@ class DynGESNModel(nn.Module):
             col, row = edge_index
             edge_index = SparseTensor(row=row, col=col, value=edge_weight,
                                       sparse_sizes=(x.size(-2), x.size(-2)))
-        x, h = self.reservoir(x, edge_index)
+        x, h = self.reservoir(x, edge_index, edge_weight)
 
         h = rearrange(h, 'l b n f -> b n (l f)')
         x = rearrange(x, 's l b n f -> s n b l f')

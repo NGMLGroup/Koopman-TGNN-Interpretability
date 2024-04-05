@@ -1,10 +1,11 @@
 import numpy as np
 from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.linear_model import Ridge
 
 
 class KANN:
     """Koopman Analysis of Sequence Models"""
-    def __init__(self, Z, k=None, emb="TruncatedSVD"):
+    def __init__(self, Z, alpha=1.0, k=None, emb="TruncatedSVD"):
         # Z in (batch, sequence, features)
         super(KANN, self).__init__()
 
@@ -12,6 +13,7 @@ class KANN:
         self.Zp = None
         self.C = None
 
+        self.alpha = alpha
         self.k = k
         self.emb = emb
         self.emb_engine = None
@@ -44,20 +46,26 @@ class KANN:
 
     def compute_KOP(self, X=None, Y=None, index=None):
 
+        ridge = Ridge(alpha=self.alpha, fit_intercept=False)
+
         if X is not None and Y is not None:
             # compute the KOP
             Xp = self.emb_engine.transform(X.reshape(-1, X.shape[-1])) # remove batch dim
             Yp = self.emb_engine.transform(Y.reshape(-1, Y.shape[-1])) # remove batch dim
             Xp = np.vstack([x[:idx] for x, idx in zip(Xp.reshape(-1, X.shape[1], self.k), index)])
             Yp = np.vstack([y[:idx] for y, idx in zip(Yp.reshape(-1, Y.shape[1], self.k), index)])
-            self.C, rs, _, _ = np.linalg.lstsq(Xp, Yp, rcond=None)
+            ridge.fit(Xp, Yp)
+            self.C = ridge.coef_
+            # self.C, rs, _, _ = np.linalg.lstsq(Xp, Yp, rcond=None)
 
         else:
             # split the data to before and after
             Xp, Yp = self.Zp[:, :-1, :], self.Zp[:, 1:, :]
 
             # compute the KOP
-            self.C, rs, _, _ = np.linalg.lstsq(Xp.reshape(-1, self.k), Yp.reshape(-1, self.k), rcond=None)
+            ridge.fit(Xp.reshape(-1, self.k), Yp.reshape(-1, self.k))
+            self.C = ridge.coef_
+            # self.C, rs, _, _ = np.linalg.lstsq(Xp.reshape(-1, self.k), Yp.reshape(-1, self.k), rcond=None)
 
         return self.C
 
