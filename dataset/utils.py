@@ -215,7 +215,7 @@ def load_FB(b_add_self_loops=True):
     # Assign node labels based on the content of the file
     for n in range(num_nodes):
         if len(lines[n]) == 2 or (len(lines[n]) == 4 and lines[n][0] == lines[n][2]):
-            node_label[:, n, 0] = torch.ones((timesteps)) * lines[n][1]
+            node_label[:, n, 0] = torch.ones((timesteps)) * lines[n][-1]
         elif len(lines[n]) == 4:
             node_label[:lines[n][2]-1, n, 0] = torch.ones((lines[n][2]-1)) * lines[n][1]
             node_label[lines[n][2]:, n, 0] = torch.ones((timesteps - lines[n][2])) * lines[n][3]
