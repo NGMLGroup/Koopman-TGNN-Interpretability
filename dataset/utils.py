@@ -2,7 +2,6 @@ import torch
 import tsl
 import h5py
 import os
-import scipy.io
 
 import requests
 import numpy as np
@@ -12,11 +11,9 @@ import warnings
 from tsl.datasets import PvUS
 from models.DynGraphESN import DynGESNModel
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 from einops import rearrange
 from numpy import loadtxt, ndarray
 from torch_geometric.utils import add_self_loops
-from torch_geometric.utils.convert import from_scipy_sparse_matrix
 
 
 
@@ -224,11 +221,15 @@ def load_FB(b_add_self_loops=True):
     node_labels = [node_label[:, graph_idx == i,:] for i in range(1, num_graphs + 1)]
 
     edge_index = (A.T - 1).int()
-    if b_add_self_loops:
-        edge_index, edge_attr = add_self_loops(edge_index, edge_attr, fill_value=timesteps)
 
     # Split edge index and edge attributes based on graph index
-    num_nodes_per_graph = torch.cumsum(torch.cat([torch.tensor([0]), torch.unique(graph_idx, return_counts=True)[1]]), dim=0)
+    # Node indices need to be translated to 0-based indices
+    num_nodes_per_graph = torch.cumsum(
+                            torch.cat([
+                                torch.tensor([0]), # first graph doesn't need to be translated
+                                torch.unique(graph_idx, return_counts=True)[1]
+                                ]), 
+                            dim=0)
     edge_index_split = [(edge_index[:, (graph_idx[edge_index[0,:].long()].int() - 1) == i] - num_nodes_per_graph[i]).long() for i in range(0, num_graphs)]
     edge_attr_split = [edge_attr[(graph_idx[edge_index[0,:].long()].int() - 1) == i] for i in range(0, num_graphs)]
 
@@ -238,6 +239,12 @@ def load_FB(b_add_self_loops=True):
     for edge_index, edge_attr in zip(edge_index_split, edge_attr_split):
         edge_indexes.append([edge_index[:, edge_attr == t] for t in range(1, timesteps+1)])
     
+    # Add self-loops for each graph, for each time-step
+    if b_add_self_loops:
+        for g in tqdm(range(len(edge_indexes))):
+            for t in range(len(edge_indexes[g])):
+                edge_indexes[g][t], _ = add_self_loops(edge_indexes[g][t])
+
     return edge_indexes, node_labels, graph_labels
 
 
