@@ -243,7 +243,7 @@ def load_FB(b_add_self_loops=True):
     if b_add_self_loops:
         for g in tqdm(range(len(edge_indexes))):
             for t in range(len(edge_indexes[g])):
-                edge_indexes[g][t], _ = add_self_loops(edge_indexes[g][t])
+                edge_indexes[g][t], _ = add_self_loops(edge_indexes[g][t], num_nodes=num_nodes_per_graph[g+1])
 
     return edge_indexes, node_labels, graph_labels
 
