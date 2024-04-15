@@ -2,11 +2,23 @@ import wandb
 import os
 import torch
 import tsl
+import random
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
 from dataset.utils import load_FB
 from models.DynGraphConvRNN import DynGraphModel
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from sklearn.decomposition import PCA
+from einops import rearrange
+
+seed = 42
+random.seed(seed)
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 # Set up config
 config = {
@@ -15,7 +27,9 @@ config = {
         'readout_layers': 2,
         'cell_type': 'lstm',
         'dim_red': 16,
-        'self_loop': False
+        'self_loop': False,
+        'verbose': True,
+        'cat_states_layers': True
         }
 
 wandb.init(project="koopman", config=config)
@@ -29,6 +43,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
+verbose = config.verbose
 
 # Define dataset
 edge_indexes, node_labels, graph_labels = load_FB(config.self_loop)
@@ -48,12 +63,10 @@ class DynGraphDataset(Dataset):
                                   edge_index=self.edge_indexes[idx]),
                 self.graph_labels[idx])
     
-dataset = DynGraphDataset(edge_indexes[:50], node_labels[:50], graph_labels[:50])
+dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
 
 # Split dataset into train and validation sets
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+train_dataset, val_dataset = train_test_split(dataset, test_size=0.2, stratify=dataset.graph_labels, random_state=seed)
 
 # Define model
 input_size = 1
@@ -62,12 +75,13 @@ model = DynGraphModel(
     hidden_size=config.hidden_size,
     rnn_layers=config.rnn_layers,
     readout_layers=config.readout_layers,
-    cell_type=config.cell_type
+    cell_type=config.cell_type,
+    cat_states_layers=config.cat_states_layers
 ).to(device)
 
 # Define loss function and optimizer
 criterion = torch.nn.BCEWithLogitsLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
 # Define scheduler
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
@@ -75,27 +89,27 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 model.train()
 
 # Train the model
-num_epochs = 3
+num_epochs = 200
 best_loss = float('inf')
 patience = 10
 counter = 0
 
 for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     for data in tqdm(train_dataset, position=1, leave=False):
-        inputs, labels = data
+        input, label = data
 
         # Move the inputs and labels to the device
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+        input = input.to(device)
+        label = label.to(device)
 
         # Zero the gradients
         optimizer.zero_grad()
 
         # Forward pass
-        outputs, _ = model(inputs.input.x.unsqueeze(0), inputs.edge_index, None)
+        output, _ = model(input.input.x.unsqueeze(0), input.edge_index, None)
 
         # Compute the loss
-        loss = criterion(outputs.squeeze(), labels)
+        loss = criterion(output.squeeze(), label)
 
         # Backward pass and optimization
         loss.backward()
@@ -103,22 +117,26 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     
     # Step the scheduler
     scheduler.step()
+    wandb.log({"lr": scheduler.get_last_lr()})
 
     # Validation
     total_loss = 0
+    hs, labels = [], []
     with torch.no_grad():
         for data in val_dataset:
-            inputs, labels = data
+            input, label = data
 
             # Move the inputs and labels to the device
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            input = input.to(device)
+            label = label.to(device)
 
             # Forward pass
-            outputs, _ = model(inputs.input.x.unsqueeze(0), inputs.edge_index, None)
+            output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
+            hs.append(h.sum(dim=-2).squeeze()) # sum nodes
+            labels.append(label)
 
             # Compute the loss
-            loss = criterion(outputs.squeeze(), labels)
+            loss = criterion(output.squeeze(), label)
 
             # Accumulate the total loss
             total_loss += loss.item()
@@ -126,8 +144,10 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     # Calculate the average validation loss
     avg_loss = total_loss / len(val_dataset)
 
-    # Print the average validation loss
-    print("Average Validation Loss: {:.4f}".format(avg_loss))
+    # Log the average validation loss
+    wandb.log({"epoch": epoch, "val_loss": avg_loss})
+    if verbose:
+        print("Validation Loss: {:.4f}".format(avg_loss))
 
     # Check if the current loss is the best so far
     if avg_loss < best_loss:
@@ -138,7 +158,8 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
 
     # Check if early stopping criteria is met
     if counter >= patience:
-        print("Early stopping at epoch", epoch)
+        if verbose:
+            print("Early stopping at epoch", epoch)
         break
         
 
@@ -146,32 +167,78 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
 model.eval()
 
 # Validation
-total_loss = 0
+outputs, hs_val, labels_val = [], [], []
 with torch.no_grad():
     for data in tqdm(val_dataset, desc='Validation'):
-        inputs, labels = data
+        input, label = data
 
         # Move the inputs and labels to the device
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+        input = input.to(device)
+        label = label.to(device)
 
         # Forward pass
-        outputs, _ = model(inputs.input.x.unsqueeze(0), inputs.edge_index, None)
+        output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        outputs.append(output.squeeze())
+        hs_val.append(h.sum(dim=-2).squeeze()) # sum nodes
+        labels_val.append(label)
 
-        # Compute the loss
-        loss = criterion(outputs.squeeze(), labels)
+# Compute binary classification accuracy
+outputs = torch.stack(outputs)
+labels_val = torch.stack(labels_val)
+predictions = torch.sigmoid(outputs) > 0.5
+accuracy = (predictions == labels_val).sum().item() / len(labels_val)
+wandb.log({"accuracy": accuracy})
+if verbose:
+    print("Accuracy: {:.4f}".format(accuracy))
 
-        # Accumulate the total loss
-        total_loss += loss.item()
 
-# Calculate the average validation loss
-avg_loss = total_loss / len(val_dataset)
+# Perform PCA on the hidden states
+# Train states
+hs = torch.stack(hs) # shape [batch, time, hidden_size]
+hs = hs.cpu().numpy()
+# Validation states
+hs_val = torch.stack(hs_val) # shape [batch, time, hidden_size]
+hs_val = hs_val.cpu().numpy()
 
-# Print the average validation loss
-print("Average Validation Loss: {:.4f}".format(avg_loss))
+# Dimensionality reduction
+dim_red = config.dim_red
+pca = PCA(n_components=dim_red)
+hs_val_red = pca.fit_transform(hs_val.reshape(-1, hs_val.shape[-1]))
+hs_val_red = rearrange(hs_val_red, '(b t) f -> b t f', b=hs_val.shape[0], t=hs_val.shape[1], f=dim_red)
 
-# make pca and plots
 
-# log on wandb the loss plot and the other relevant plots
+# Plots
 
-# log on tqdm the val loss and lr
+# Plot covariance matrix of reduced states
+fig, ax = plt.subplots()
+cov = ax.imshow(hs_val_red.reshape(-1,hs_val_red.shape[-1]).T @ hs_val_red.reshape(-1,hs_val_red.shape[-1]), cmap='viridis')
+plt.colorbar(cov, ax=ax)
+wandb.log({"cov_img": wandb.Image(fig)})
+plt.close(fig)
+
+
+# Plot state distribution of the first 2 PCA components
+idx0 = labels == 0
+idx1 = labels == 1
+label_0 = hs_val_red[idx0, -1, :2]
+label_1 = hs_val_red[idx1, -1, :2]
+
+# Create a figure with two subplots
+fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+# Plot the first histogram in the first subplot
+hist0 = axs[0].hist2d(label_0[:, 0], label_0[:, 1], bins=10, cmap='Blues', alpha=0.6)
+axs[0].set_xlabel('PC 0')
+axs[0].set_ylabel('PC 1')
+axs[0].set_title('2D Histogram - Label 0')
+plt.colorbar(hist0[3], ax=axs[0])
+# Plot the second histogram in the second subplot
+hist1 = axs[1].hist2d(label_1[:, 0], label_1[:, 1], bins=10, cmap='Reds', alpha=0.6)
+axs[1].set_xlabel('PC 0')
+axs[1].set_ylabel('PC 1')
+axs[1].set_title('2D Histogram - Label 1')
+plt.colorbar(hist1[3], ax=axs[1])
+# Adjust the spacing between subplots
+plt.tight_layout()
+
+wandb.log({"hist_PC_img": wandb.Image(fig)})
+plt.close(fig)

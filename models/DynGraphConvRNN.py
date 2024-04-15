@@ -154,6 +154,7 @@ class DynGraphModel(BaseModel):
                  rnn_layers,
                  readout_layers,
                  cell_type='gru',
+                 cat_states_layers=False
                 #  activation='relu'
                  ):
         super(DynGraphModel, self).__init__()
@@ -161,12 +162,14 @@ class DynGraphModel(BaseModel):
         self.encoder = DynGraphConvRNN(input_size=input_size,
                            hidden_size=hidden_size,
                            n_layers=rnn_layers,
+                           cat_states_layers=cat_states_layers,
                            return_only_last_state=False,
                            asymmetric_norm=False,
                            cell=cell_type,
                         #    activation=activation
                            )
 
+        hidden_size = hidden_size * rnn_layers if cat_states_layers else hidden_size
         self.readout = nn.ModuleList()
         for n in range(readout_layers):
             if n < readout_layers - 1:
@@ -178,7 +181,8 @@ class DynGraphModel(BaseModel):
         """"""
         # x: [batches steps nodes features]
 
-        x, h = self.encoder(x, edge_index, edge_weight)
+        x, _ = self.encoder(x, edge_index, edge_weight)
+        h = x
 
         # take last time step and sum over nodes
         x = x[:,-1].sum(-2)
