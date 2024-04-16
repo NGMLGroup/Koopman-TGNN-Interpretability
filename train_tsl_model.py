@@ -118,7 +118,7 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     
     # Step the scheduler
     scheduler.step()
-    wandb.log({"lr": scheduler.get_last_lr()})
+    wandb.log({"lr": scheduler.get_last_lr()[0]})
 
     # Validation
     total_loss = 0
@@ -219,8 +219,8 @@ plt.close(fig)
 
 
 # Plot state distribution of the first 2 PCA components
-idx0 = labels == 0
-idx1 = labels == 1
+idx0 = labels_val == 0
+idx1 = labels_val == 1
 label_0 = hs_val_red[idx0, -1, :2]
 label_1 = hs_val_red[idx1, -1, :2]
 
