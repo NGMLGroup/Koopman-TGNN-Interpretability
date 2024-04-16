@@ -219,8 +219,8 @@ plt.close(fig)
 
 
 # Plot state distribution of the first 2 PCA components
-idx0 = labels_val == 0
-idx1 = labels_val == 1
+idx0 = labels_val.cpu().numpy() == 0
+idx1 = labels_val.cpu().numpy() == 1
 label_0 = hs_val_red[idx0, -1, :2]
 label_1 = hs_val_red[idx1, -1, :2]
 
