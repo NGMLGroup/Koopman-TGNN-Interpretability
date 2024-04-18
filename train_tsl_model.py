@@ -29,7 +29,8 @@ config = {
         'dim_red': 16,
         'self_loop': False,
         'verbose': True,
-        'cat_states_layers': True
+        'cat_states_layers': True,
+        'weight_decay': 1e-4
         }
 
 wandb.init(project="koopman", config=config)
@@ -81,7 +82,7 @@ model = DynGraphModel(
 
 # Define loss function and optimizer
 criterion = torch.nn.BCEWithLogitsLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=config.weight_decay)
 # Define scheduler
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
