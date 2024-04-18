@@ -92,9 +92,9 @@ model.train()
 # Train the model
 num_epochs = 200
 best_loss = float('inf')
-patience = 10
+patience = 30
 counter = 0
-min_delta = 1e-4
+min_delta = 1e-5
 
 for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     for data in tqdm(train_dataset, position=1, leave=False):
@@ -149,7 +149,7 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     # Log the average validation loss
     wandb.log({"epoch": epoch, "val_loss": avg_loss})
     if verbose:
-        print("Validation Loss: {:.4f}".format(avg_loss))
+        print("Validation Loss: {:.6f}".format(avg_loss))
 
     # Check if the current loss is the best so far
     if best_loss - avg_loss > min_delta:
