@@ -168,13 +168,13 @@ def process_PVUS(config, device, threshold=0.7, train_ratio=0.7, test_ratio=0.2,
     return train_dataloader, test_dataloader, val_dataloader
 
 
-def load_FB(b_add_self_loops=True):
+def load_classification_dataset(name, b_add_self_loops=True):
     # Specify the folder path
-    folder_path = "dataset/facebook_ct1/"
+    folder_path = f"dataset/{name}/"
 
     # Get the list of file names in the folder
-    file_names = ["facebook_ct1_A.txt", "facebook_ct1_edge_attributes.txt", "facebook_ct1_graph_indicator.txt", 
-                "facebook_ct1_graph_labels.txt"]
+    file_names = [f"{name}_A.txt", f"{name}_edge_attributes.txt", 
+                  f"{name}_graph_indicator.txt", f"{name}_graph_labels.txt"]
 
     # Initialize an empty list to store the data
     data = []
@@ -199,7 +199,7 @@ def load_FB(b_add_self_loops=True):
     num_graphs = graph_idx.max().int()
 
     # Read node labels from file
-    file_path = os.path.join(folder_path, "facebook_ct1_node_labels.txt")
+    file_path = os.path.join(folder_path, f"{name}_node_labels.txt")
     file = open(file_path, 'r')
     lines = file.readlines()
 
@@ -248,9 +248,9 @@ def load_FB(b_add_self_loops=True):
     return edge_indexes, node_labels, graph_labels
 
 
-def run_dyn_gesn_FB(file_path, config, device, verbose=False):
+def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     # Load dataset
-    edge_indexes, node_labels, graph_labels = load_FB(config['add_self_loops'])
+    edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'], config['add_self_loops'])
 
     # Define the model
     feat_size = 1
@@ -317,13 +317,13 @@ def run_dyn_gesn_FB(file_path, config, device, verbose=False):
         print("Saved results to H5 file.")
 
 
-def process_FB(config, device, ignore_file=True, verbose=False):
+def process_classification_dataset(config, device, ignore_file=True, verbose=False):
 
     # Specify the path to the H5 file
-    file_path = "dataset/facebook_ct1/processed/"
+    file_path = f"dataset/{config['dataset']}/processed/"
 
     if not os.path.exists(file_path + "dataset.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
-        run_dyn_gesn_FB(file_path, config, device, verbose=verbose)
+        run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
     
     dataset = H5Dataset(file_path + "dataset.h5", "input", "label")
     states = H5Dataset(file_path + "states.h5", "states", "label")
