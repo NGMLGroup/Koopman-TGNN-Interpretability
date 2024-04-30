@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
-from dataset.utils import load_FB
+from dataset.utils import load_classification_dataset
 from models.DynGraphConvRNN import DynGraphModel
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -22,6 +22,7 @@ np.random.seed(seed)
 
 # Set up config
 config = {
+        'dataset': 'facebook_ct1', # 'infectious_ct1', #
         'hidden_size': 16,
         'rnn_layers': 5,
         'readout_layers': 2,
@@ -47,7 +48,7 @@ else:
 verbose = config.verbose
 
 # Define dataset
-edge_indexes, node_labels, graph_labels = load_FB(config.self_loop)
+edge_indexes, node_labels, graph_labels = load_classification_dataset(config.dataset, config.self_loop)
 
 class DynGraphDataset(Dataset):
     def __init__(self, edge_indexes, node_labels, graph_labels):
