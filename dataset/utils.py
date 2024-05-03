@@ -205,7 +205,7 @@ def load_classification_dataset(name, b_add_self_loops=True):
 
     lines = [list(map(int, line.strip().split(','))) for line in lines]
 
-    timesteps = 106
+    timesteps = 106 # FIXME: is it different for each dataset?
 
     node_label = torch.zeros((timesteps, num_nodes, 1))
 
@@ -274,6 +274,7 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     inputs = []
     labels = []
     states = []
+    node_states = []
 
     if verbose:
         print("Running DynGESN model...")
@@ -286,6 +287,7 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
         output = rearrange(output, 't n l f -> t n (l f)')
         inputs.append(output.detach().cpu().sum(dim=1)[-1,:])
         states.append(output.detach().cpu().sum(dim=1))
+        node_states.append(output.detach().cpu().numpy())
         labels.append(sample.target.y.detach().cpu())
 
     if verbose:
@@ -299,15 +301,12 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     states = torch.stack(states, dim=0).squeeze()
     labels = torch.stack(labels, dim=0)
 
-    if not os.path.exists(file_path + "dataset.h5"):
-        os.makedirs(file_path + "dataset.h5")
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
 
     with h5py.File(file_path + "dataset.h5", "w") as h5_file:
         h5_file.create_dataset("input", data=inputs)
         h5_file.create_dataset("label", data=labels)
-
-    if not os.path.exists(file_path + "states.h5"):
-        os.makedirs(file_path + "states.h5")
 
     with h5py.File(file_path + "states.h5", "w") as h5_file:
         h5_file.create_dataset("states", data=states)
@@ -315,6 +314,8 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     
     if verbose:
         print("Saved results to H5 file.")
+    
+    return node_states
 
 
 def process_classification_dataset(config, device, ignore_file=True, verbose=False):
@@ -323,12 +324,12 @@ def process_classification_dataset(config, device, ignore_file=True, verbose=Fal
     file_path = f"dataset/{config['dataset']}/processed/"
 
     if not os.path.exists(file_path + "dataset.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
-        run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
+        node_states = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
     
     dataset = H5Dataset(file_path + "dataset.h5", "input", "label")
     states = H5Dataset(file_path + "states.h5", "states", "label")
 
-    return dataset, states
+    return dataset, states, node_states
 
 
 
