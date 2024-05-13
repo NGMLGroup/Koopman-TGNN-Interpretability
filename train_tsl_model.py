@@ -23,15 +23,15 @@ np.random.seed(seed)
 # Set up config
 config = {
         'dataset': 'facebook_ct1', # 'infectious_ct1', #
-        'hidden_size': 16,
-        'rnn_layers': 5,
-        'readout_layers': 2,
+        'hidden_size': 32,
+        'rnn_layers': 8,
+        'readout_layers': 3,
         'cell_type': 'lstm',
-        'dim_red': 16,
+        'dim_red': 64,
         'self_loop': False,
         'verbose': True,
         'cat_states_layers': True,
-        'weight_decay': 1e-4
+        'weight_decay': 1e-3
         }
 
 wandb.init(project="koopman", config=config)
@@ -85,7 +85,7 @@ model = DynGraphModel(
 criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=config.weight_decay)
 # Define scheduler
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
 # Set the model to training mode
 model.train()
@@ -164,7 +164,9 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
         if verbose:
             print("Early stopping at epoch", epoch)
         break
-        
+
+# Save the model
+torch.save(model.state_dict(), f'models/saved/dynConvRNN_{config.dataset}.pt')    
 
 # Set the model to evaluation mode
 model.eval()
