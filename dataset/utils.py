@@ -10,10 +10,13 @@ import warnings
 
 from tsl.datasets import PvUS
 from models.DynGraphESN import DynGESNModel
+from models.DynGraphConvRNN import DynGraphModel
 from tqdm import tqdm
 from einops import rearrange
 from numpy import loadtxt, ndarray
 from torch_geometric.utils import add_self_loops
+from torch.utils.data import Dataset
+import sys
 
 
 
@@ -38,6 +41,22 @@ class H5Dataset(torch.utils.data.Dataset):
             target_data = torch.tensor(self.targets[index])
         sample = {'x': input_data, 'y': target_data}
         return input_data, target_data
+    
+
+class DynGraphDataset(Dataset):
+    def __init__(self, edge_indexes, node_labels, graph_labels):
+        self.edge_indexes = edge_indexes
+        self.node_labels = node_labels
+        self.graph_labels = graph_labels
+
+    def __len__(self):
+        return len(self.edge_indexes)
+
+    def __getitem__(self, idx):
+        return (tsl.data.data.Data(input={'x': self.node_labels[idx]},
+                                  target={'y': self.graph_labels[idx]},
+                                  edge_index=self.edge_indexes[idx]),
+                self.graph_labels[idx])
     
 
 def run_dyn_gesn_PV(file_path, threshold, config, device, zones=['west'], freq='H', verbose=False):
@@ -318,16 +337,100 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     return node_states
 
 
-def process_classification_dataset(config, device, ignore_file=True, verbose=False):
+def run_dyn_crnn_classification(file_path, config, device, verbose=False):
+    # Load dataset
+    edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'], config['add_self_loops'])
+    dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
+
+    # Define the model
+    input_size = 1
+    model = DynGraphModel(input_size=input_size,
+                            hidden_size=config['hidden_size'],
+                            rnn_layers=config['rnn_layers'],
+                            readout_layers=config['readout_layers'],
+                            cell_type=config['cell_type'],
+                            cat_states_layers=config['cat_states_layers']).to(device)
+
+    # Load the model from the file
+    model_filepath = f'models/saved/dynConvRNN_{config["dataset"]}.pt'
+    if not os.path.exists(model_filepath):
+        raise FileNotFoundError(f"Model file '{model_filepath}' not found. Train the model first.")
+    model.load_state_dict(torch.load(model_filepath))
+    model = model.to(device)
+    model.eval()
+
+    labels = []
+    outputs = []
+    states = []
+    node_states = []
+
+    if verbose:
+        print("Running DynCRNN model...")
+
+    for data in tqdm(dataset):
+        input, label = data
+
+        # Move the inputs and labels to the device
+        input = input.to(device)
+        label = label.to(device)
+
+        # Run the model
+        initial_memory = torch.cuda.memory_allocated(device)
+        output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        outputs.append(output.squeeze().cpu())
+        states.append(h.sum(dim=-2).squeeze().cpu())
+        labels.append(label.cpu())
+        node_states.append(h.squeeze().cpu())
+        after_memory = torch.cuda.memory_allocated(device)
+
+        # Print the memory occupied by the model
+        tqdm.write(f"Used memory: {after_memory - initial_memory}")
+        
+
+    if verbose:
+        print("DynCRNN model run complete.")
+
+    # Save the torch_dataset to the H5 file
+    if verbose:
+        print("Saving results to H5 file...")
+
+    inputs = torch.stack(inputs, dim=0).squeeze() # FIXME: This is the prediction, should I change name?
+    states = torch.stack(states, dim=0).squeeze()
+    labels = torch.stack(labels, dim=0)
+
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+
+    with h5py.File(file_path + "dataset_DynCRNN.h5", "w") as h5_file:
+        h5_file.create_dataset("input", data=inputs)
+        h5_file.create_dataset("label", data=labels)
+
+    with h5py.File(file_path + "states_DynCRNN.h5", "w") as h5_file:
+        h5_file.create_dataset("states", data=states)
+        h5_file.create_dataset("label", data=labels)
+    
+    if verbose:
+        print("Saved results to H5 file.")
+    
+    return node_states
+
+
+def process_classification_dataset(config, model, device, ignore_file=True, verbose=False):
 
     # Specify the path to the H5 file
     file_path = f"dataset/{config['dataset']}/processed/"
 
-    if not os.path.exists(file_path + "dataset.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
-        node_states = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
+    if model=="DynGESN":
+        if not os.path.exists(file_path + f"dataset_{model}.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
+            node_states = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
+    elif model=="DynCRNN":
+        if not os.path.exists(file_path + f"dataset_{model}.h5") or ignore_file:
+            node_states = run_dyn_crnn_classification(file_path, config, device, verbose=verbose)
+    else:
+        raise ValueError(f"Model {model} not supported.")
     
-    dataset = H5Dataset(file_path + "dataset.h5", "input", "label")
-    states = H5Dataset(file_path + "states.h5", "states", "label")
+    dataset = H5Dataset(file_path + f"dataset_{model}.h5", "input", "label")
+    states = H5Dataset(file_path + f"states_{model}.h5", "states", "label")
 
     return dataset, states, node_states
 
