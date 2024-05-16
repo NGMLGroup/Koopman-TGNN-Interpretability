@@ -416,7 +416,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
 
 
 def process_classification_dataset(config, model, device, ignore_file=True, verbose=False):
-
+    # FIXME: fix the ignore_file, when false it doesn't work due to node_states
     # Specify the path to the H5 file
     file_path = f"dataset/{config['dataset']}/processed/"
 
