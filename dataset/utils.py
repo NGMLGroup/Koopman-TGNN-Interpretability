@@ -323,11 +323,11 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
-    with h5py.File(file_path + "dataset.h5", "w") as h5_file:
+    with h5py.File(file_path + "dataset_DynGESN.h5", "w") as h5_file:
         h5_file.create_dataset("input", data=inputs)
         h5_file.create_dataset("label", data=labels)
 
-    with h5py.File(file_path + "states.h5", "w") as h5_file:
+    with h5py.File(file_path + "states_DynGESN.h5", "w") as h5_file:
         h5_file.create_dataset("states", data=states)
         h5_file.create_dataset("label", data=labels)
     
@@ -375,17 +375,11 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
         label = label.to(device)
 
         # Run the model
-        initial_memory = torch.cuda.memory_allocated(device)
         output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
-        outputs.append(output.squeeze().cpu())
-        states.append(h.sum(dim=-2).squeeze().cpu())
-        labels.append(label.cpu())
-        node_states.append(h.squeeze().cpu())
-        after_memory = torch.cuda.memory_allocated(device)
-
-        # Print the memory occupied by the model
-        tqdm.write(f"Used memory: {after_memory - initial_memory}")
-        
+        outputs.append(output.squeeze().detach().cpu())
+        states.append(h.sum(dim=-2).squeeze().detach().cpu())
+        labels.append(label.detach().cpu())
+        node_states.append(h.squeeze().detach().cpu())        
 
     if verbose:
         print("DynCRNN model run complete.")
@@ -394,7 +388,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     if verbose:
         print("Saving results to H5 file...")
 
-    inputs = torch.stack(inputs, dim=0).squeeze() # FIXME: This is the prediction, should I change name?
+    inputs = torch.stack(outputs, dim=0).squeeze() # FIXME: This is the prediction, should I change name?
     states = torch.stack(states, dim=0).squeeze()
     labels = torch.stack(labels, dim=0)
 
