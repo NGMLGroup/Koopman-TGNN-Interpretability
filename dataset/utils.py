@@ -390,6 +390,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
 
     inputs = torch.stack(outputs, dim=0).squeeze() # FIXME: This is the prediction, should I change name?
     states = torch.stack(states, dim=0).squeeze()
+    # node_states = np.asarray(node_states)
     labels = torch.stack(labels, dim=0)
 
     if not os.path.exists(file_path):
@@ -402,6 +403,12 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     with h5py.File(file_path + "states_DynCRNN.h5", "w") as h5_file:
         h5_file.create_dataset("states", data=states)
         h5_file.create_dataset("label", data=labels)
+
+    
+    # FIXME: H5Dataset wants homogeneous arrays, should I pad missing nodes with zeros?
+    # with h5py.File(file_path + "node_states_DynGESN.h5", "w") as h5_file:
+    #     h5_file.create_dataset("node_states", data=node_states)
+    #     h5_file.create_dataset("label", data=labels)
     
     if verbose:
         print("Saved results to H5 file.")
@@ -410,23 +417,58 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
 
 
 def process_classification_dataset(config, model, device, ignore_file=True, verbose=False):
-    # FIXME: fix the ignore_file, when false it doesn't work due to node_states
     # Specify the path to the H5 file
     file_path = f"dataset/{config['dataset']}/processed/"
 
+    cond = not os.path.exists(file_path + f"dataset_{model}.h5") \
+            or not os.path.exists(file_path + f"states_{model}.h5") \
+            or not os.path.exists(file_path + f"node_states_{model}.h5")
+            
     if model=="DynGESN":
-        if not os.path.exists(file_path + f"dataset_{model}.h5") or not os.path.exists(file_path + "states.h5") or ignore_file:
+        if cond or ignore_file:
             node_states = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
     elif model=="DynCRNN":
-        if not os.path.exists(file_path + f"dataset_{model}.h5") or ignore_file:
+        if cond or ignore_file:
             node_states = run_dyn_crnn_classification(file_path, config, device, verbose=verbose)
     else:
         raise ValueError(f"Model {model} not supported.")
     
     dataset = H5Dataset(file_path + f"dataset_{model}.h5", "input", "label")
     states = H5Dataset(file_path + f"states_{model}.h5", "states", "label")
+    # FIXME: H5Dataset wants homogeneous arrays
+    # node_states = H5Dataset(file_path + f"node_states_{model}.h5", "node_states", "label")
 
     return dataset, states, node_states
+
+
+def ground_truth(dataset_name):
+    # Load dataset
+    edge_indexes, node_labels, _ = load_classification_dataset(dataset_name, False)
+
+    nodes_gt, node_sums_gt, times_gt = [], [], []
+
+    # Create ground truth explanations
+    for node_label, edge_index in tqdm(zip(node_labels, edge_indexes)):
+        node_label = node_label.squeeze()
+
+        node_sum_gt = node_label.squeeze().sum(axis=1).type(torch.int)
+
+        time_gt = torch.zeros(node_label.shape[0])
+
+        for t in range(node_label.shape[0]):
+            if edge_index[t].nelement() == 0:
+                continue
+            elif edge_index[t].nelement() != 0 \
+                and node_label[t][edge_index[t].flatten()[edge_index[t].flatten().nonzero()].unique()].any() == True:
+                time_gt[t] = 1
+            else:
+                continue
+
+        nodes_gt.append(node_label)
+        node_sums_gt.append(node_sum_gt)
+        times_gt.append(time_gt)
+    
+    return nodes_gt, node_sums_gt, times_gt
 
 
 
