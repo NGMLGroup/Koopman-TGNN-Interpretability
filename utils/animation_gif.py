@@ -99,6 +99,8 @@ def make_gif(dataset_name, graph_idx):
 
 
 if __name__ == "__main__":
+    # Launch example:
+    # python -m utils.animation_gif "facebook_ct1" 2
 
     # Create the argument parser
     parser = argparse.ArgumentParser(description="Create GIF animation of graph visualization")
