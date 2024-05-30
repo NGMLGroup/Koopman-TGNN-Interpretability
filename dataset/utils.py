@@ -456,11 +456,17 @@ def ground_truth(dataset_name):
         time_gt = torch.zeros(node_label.shape[0])
 
         for t in range(node_label.shape[0]):
-            if edge_index[t].nelement() == 0:
-                continue
-            elif edge_index[t].nelement() != 0 \
-                and node_label[t][edge_index[t].flatten()[edge_index[t].flatten().nonzero()].unique()].any() == True:
-                time_gt[t] = 1
+
+            if t==node_label.shape[0]-2:
+                break
+
+            # Both nodes of each edge are active at t+1
+            cond1 = torch.where(node_label[t+2][edge_index[t].T] == torch.tensor([[1,1]]), 1, 0).all(dim=1)
+            # but one of the nodes was not active at t
+            cond2 = (node_label[t][edge_index[t].T][node_label[t+2][edge_index[t].T].all(dim=1)] == torch.tensor([1,0])).all(dim=1)
+
+            if edge_index[t].nelement() != 0 and cond1.any() == True and cond2.any() == True:
+                time_gt[t] = cond1.sum().item() / 2
             else:
                 continue
 
