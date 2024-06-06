@@ -451,27 +451,31 @@ def ground_truth(dataset_name):
     for node_label, edge_index in tqdm(zip(node_labels, edge_indexes)):
         node_label = node_label.squeeze()
 
-        node_sum_gt = node_label.squeeze().sum(axis=1).type(torch.int)
-
         time_gt = torch.zeros(node_label.shape[0])
+        node_gt = torch.zeros_like(node_label)
 
         for t in range(node_label.shape[0]):
+    
+            if t != 0:
+                node_gt[t,:] = node_gt[t-1,:]
 
-            if t==node_label.shape[0]-2:
-                break
+            if t>=node_label.shape[0]-2:
+                continue
 
-            # Both nodes of each edge are active at t+1
+            # Both nodes of each edge are active at t+2
             cond1 = torch.where(node_label[t+2][edge_index[t].T] == torch.tensor([[1,1]]), 1, 0).all(dim=1)
             # but one of the nodes was not active at t
             cond2 = (node_label[t][edge_index[t].T][node_label[t+2][edge_index[t].T].all(dim=1)] == torch.tensor([1,0])).all(dim=1)
 
             if edge_index[t].nelement() != 0 and cond1.any() == True and cond2.any() == True:
                 time_gt[t] = cond1.sum().item() / 2
+                mask = edge_index[t].T[cond1].flatten()
+                node_gt[t,mask] = 1
             else:
                 continue
 
-        nodes_gt.append(node_label)
-        node_sums_gt.append(node_sum_gt)
+        nodes_gt.append(node_gt)
+        node_sums_gt.append(node_gt.squeeze().sum(axis=1).type(torch.int))
         times_gt.append(time_gt)
     
     return nodes_gt, node_sums_gt, times_gt
