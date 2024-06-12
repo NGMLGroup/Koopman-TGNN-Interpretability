@@ -334,7 +334,7 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     if verbose:
         print("Saved results to H5 file.")
     
-    return node_states
+    return node_states, node_labels
 
 
 def run_dyn_crnn_classification(file_path, config, device, verbose=False):
@@ -413,7 +413,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     if verbose:
         print("Saved results to H5 file.")
     
-    return node_states
+    return node_states, node_labels
 
 
 def process_classification_dataset(config, model, device, ignore_file=True, verbose=False):
@@ -426,10 +426,10 @@ def process_classification_dataset(config, model, device, ignore_file=True, verb
             
     if model=="DynGESN":
         if cond or ignore_file:
-            node_states = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
+            node_states, node_labels = run_dyn_gesn_classification(file_path, config, device, verbose=verbose)
     elif model=="DynCRNN":
         if cond or ignore_file:
-            node_states = run_dyn_crnn_classification(file_path, config, device, verbose=verbose)
+            node_states, node_labels = run_dyn_crnn_classification(file_path, config, device, verbose=verbose)
     else:
         raise ValueError(f"Model {model} not supported.")
     
@@ -438,7 +438,7 @@ def process_classification_dataset(config, model, device, ignore_file=True, verb
     # FIXME: H5Dataset wants homogeneous arrays
     # node_states = H5Dataset(file_path + f"node_states_{model}.h5", "node_states", "label")
 
-    return dataset, states, node_states
+    return dataset, states, node_states, node_labels
 
 
 def ground_truth(dataset_name):
@@ -464,8 +464,8 @@ def ground_truth(dataset_name):
 
             # Both nodes of each edge are active at t+2
             cond1 = torch.where(node_label[t+2][edge_index[t].T] == torch.tensor([[1,1]]), 1, 0).all(dim=1)
-            # but one of the nodes was not active at t
-            cond2 = (node_label[t][edge_index[t].T][node_label[t+2][edge_index[t].T].all(dim=1)] == torch.tensor([1,0])).all(dim=1)
+            # but one of the nodes was not active at t+1
+            cond2 = (node_label[t+1][edge_index[t].T][node_label[t+2][edge_index[t].T].all(dim=1)] == torch.tensor([1,0])).all(dim=1)
 
             if edge_index[t].nelement() != 0 and cond1.any() == True and cond2.any() == True:
                 time_gt[t] = cond1.sum().item() / 2
