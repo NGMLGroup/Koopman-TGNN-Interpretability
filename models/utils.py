@@ -232,3 +232,13 @@ def normalize(edge_index: SparseTensArray, edge_weights: OptTensArray = None,
     index = edge_index[dim]
     degree = weighted_degree(index, edge_weights, num_nodes=num_nodes)
     return edge_index, edge_weights / degree[index].squeeze()
+
+
+def freeze_weights(model):
+    for param in model.parameters():
+        param.requires_grad = False
+
+
+def unfreeze_weights(model):
+    for param in model.parameters():
+        param.requires_grad = True
