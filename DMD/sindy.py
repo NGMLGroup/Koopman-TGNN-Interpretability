@@ -1,5 +1,6 @@
 # from https://github.com/kpchamp/SindyAutoencoders/blob/master/src/sindy_utils.py
 
+import torch
 import numpy as np
 from scipy.special import binom
 from scipy.integrate import odeint
@@ -61,6 +62,24 @@ def sindy_library(X, poly_order, include_sine=False):
         for i in range(n):
             library[:,index] = np.sin(X[:,i])
             index += 1
+
+    return library
+
+
+def sindy_library_adj(X, adj):
+    N, T, F = X.shape
+
+    L = torch.nonzero(adj).size(0)
+    library = torch.empty((N+L,T,F))
+    index = 0
+
+    library[:N] = X
+    
+    for i in range(N):
+        for j in range(N):
+            if adj[i,j]:
+                library[N+index] = X[i]*X[j]
+                index += 1
 
     return library
 
