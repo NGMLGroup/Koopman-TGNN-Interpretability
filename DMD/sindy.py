@@ -70,15 +70,16 @@ def sindy_library_adj(X, adj):
     N, T, F = X.shape
 
     L = torch.nonzero(adj).size(0)
-    library = torch.empty((N+L,T,F))
+    library = torch.empty((2*N+L,T,F))
     index = 0
 
     library[:N] = X
+    library[N:2*N] = X**2
     
     for i in range(N):
         for j in range(N):
             if adj[i,j]:
-                library[N+index] = X[i]*X[j]
+                library[2*N+index] = X[i]*X[j]
                 index += 1
 
     return library
