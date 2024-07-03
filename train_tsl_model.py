@@ -33,7 +33,8 @@ config = {
         'cat_states_layers': True,
         'weight_decay': 1e-3,
         'step_size': 30,
-        'gamma': 0.5
+        'gamma': 0.5,
+        'beta': 1.0
         }
 
 wandb.init(project="koopman", config=config)
@@ -84,7 +85,9 @@ model = DynGraphModel(
 ).to(device)
 
 # Define loss function and optimizer
-criterion = torch.nn.BCEWithLogitsLoss()
+criterion_pred = torch.nn.BCEWithLogitsLoss()
+criterion_rec = torch.nn.BCEWithLogitsLoss()
+criterion_obs = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=config.weight_decay)
 # Define scheduler
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.step_size, gamma=config.gamma)
@@ -111,21 +114,27 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
         optimizer.zero_grad()
 
         # Forward pass
-        output, _ = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
 
         # Compute the loss
-        loss = criterion(output.squeeze(), label)
+        l2_reg = config.weight_decay * torch.sum(torch.pow(model.encoder.K, 2))
+        loss_pred = criterion_pred(x.squeeze(), label)
+        loss_rec = criterion_rec(x_rec.squeeze(), label)
+        loss_obs = criterion_obs(h_rec, h)
+        loss_ridge = loss_obs + l2_reg
+        loss_sum = loss_pred + loss_rec + config.beta * loss_ridge
 
         # Backward pass and optimization
-        loss.backward()
+        loss_sum.backward()
         optimizer.step()
     
     # Step the scheduler
     scheduler.step()
-    wandb.log({"lr": scheduler.get_last_lr()[0]})
+    wandb.log({"epoch": epoch, "lr": scheduler.get_last_lr()[0]})
 
     # Validation
     total_loss = 0
+    total_loss_pred, total_loss_rec, total_loss_ridge, total_loss_obs = 0, 0, 0, 0
     hs, labels = [], []
     with torch.no_grad():
         for data in val_dataset:
@@ -136,21 +145,38 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
             label = label.to(device)
 
             # Forward pass
-            output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
+            x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
             hs.append(h.sum(dim=-2).squeeze()) # sum nodes
             labels.append(label)
 
             # Compute the loss
-            loss = criterion(output.squeeze(), label)
+            l2_reg = config.weight_decay * torch.sum(torch.pow(model.encoder.K, 2))
+            loss_pred = criterion_pred(x.squeeze(), label)
+            loss_rec = criterion_rec(x_rec.squeeze(), label)
+            loss_obs = criterion_obs(h_rec, h)
+            loss_ridge = loss_obs + l2_reg
+            loss_sum = loss_pred + loss_rec + config.beta * loss_ridge
 
             # Accumulate the total loss
-            total_loss += loss.item()
+            total_loss += loss_sum.item()
+            total_loss_pred += loss_pred.item()
+            total_loss_rec += loss_rec.item()
+            total_loss_ridge += loss_ridge.item()
+            total_loss_obs += loss_obs.item()
 
     # Calculate the average validation loss
     avg_loss = total_loss / len(val_dataset)
+    avg_loss_pred = total_loss_pred / len(val_dataset)
+    avg_loss_rec = total_loss_rec / len(val_dataset)
+    avg_loss_ridge = total_loss_ridge / len(val_dataset)
+    avg_loss_obs = total_loss_obs / len(val_dataset)
 
     # Log the average validation loss
     wandb.log({"epoch": epoch, "val_loss": avg_loss})
+    wandb.log({"epoch": epoch, "val_loss_pred": avg_loss_pred})
+    wandb.log({"epoch": epoch, "val_loss_rec": avg_loss_rec})
+    wandb.log({"epoch": epoch, "val_loss_ridge": avg_loss_ridge})
+    wandb.log({"epoch": epoch, "val_loss_obs": avg_loss_obs})
     if verbose:
         print("Validation Loss: {:.6f}".format(avg_loss))
 
@@ -184,8 +210,8 @@ with torch.no_grad():
         label = label.to(device)
 
         # Forward pass
-        output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
-        outputs.append(output.squeeze())
+        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        outputs.append(x.squeeze())
         hs_val.append(h.sum(dim=-2).squeeze()) # sum nodes
         labels_val.append(label)
 

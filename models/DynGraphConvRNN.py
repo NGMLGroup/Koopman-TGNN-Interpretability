@@ -92,6 +92,13 @@ class DynGraphConvRNN(RNNBase):
         ]
         super(DynGraphConvRNN, self).__init__(rnn_cells, cat_states_layers,
                                            return_only_last_state)
+        
+        if not self.cat_states_layers:
+            self.K = nn.Parameter(nn.init.xavier_uniform_(torch.Tensor(hidden_size, hidden_size)),
+                                    requires_grad=True)
+        else:
+            self.K = nn.Parameter(nn.init.xavier_uniform_(torch.Tensor(hidden_size*n_layers, hidden_size*n_layers)),
+                                    requires_grad=True)
     
     def forward(self,
                 x: Tensor,
@@ -121,12 +128,15 @@ class DynGraphConvRNN(RNNBase):
                 h_out = h_out[-1]
             out.append(h_out)
 
+        out_rec = [out[0] @ self.K**step for step in range(steps)]
+
         if self.return_only_last_state:
             # out: [batch, *, features]
             return out[-1]
         # out: [batch, time, *, features]
         out = torch.stack(out, dim=1)
-        return out, h
+        out_rec = torch.stack(out_rec, dim=1)
+        return out, h, out_rec
 
 
 class DynGraphModel(BaseModel):
@@ -181,12 +191,15 @@ class DynGraphModel(BaseModel):
         """"""
         # x: [batches steps nodes features]
 
-        x, _ = self.encoder(x, edge_index, edge_weight)
+        x, _, x_rec = self.encoder(x, edge_index, edge_weight)
         h = x
+        h_rec = x_rec
 
         # take last time step and sum over nodes
         x = x[:,-1].sum(-2)
+        x_rec = x_rec[:,-1].sum(-2)
         for layer in self.readout:
             x = layer(x)
+            x_rec = layer(x_rec)
 
-        return x, h
+        return x, h, x_rec, h_rec
