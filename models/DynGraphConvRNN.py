@@ -187,17 +187,29 @@ class DynGraphModel(BaseModel):
             else:
                 self.readout.append(nn.Linear(hidden_size, 1))
 
-    def forward(self, x, edge_index, edge_weight, u=None, **kwargs):
+    def forward(self, x, edge_index, edge_weight, batch=None, u=None, **kwargs):
         """"""
         # x: [batches steps nodes features]
 
         x, _, x_rec = self.encoder(x, edge_index, edge_weight)
-        h = x
-        h_rec = x_rec
 
-        # take last time step and sum over nodes
-        x = x[:,-1].sum(-2)
-        x_rec = x_rec[:,-1].sum(-2)
+        # add batch dimension
+        if batch is not None:
+            batch_size = batch.max().item() + 1
+            h = [x[0,:,batch==n,:] for n in range(batch_size)]
+            h_rec = [x_rec[0,:,batch==n,:] for n in range(batch_size)]
+
+            x = torch.stack([g[-1].sum(-2) for g in h], dim=0)
+            x_rec = torch.stack([g[-1].sum(-2) for g in h_rec], dim=0)
+
+        else:
+            h = x
+            h_rec = x_rec
+
+            # take last time step and sum over nodes
+            x = x[:,-1].sum(-2)
+            x_rec = x_rec[:,-1].sum(-2)
+
         for layer in self.readout:
             x = layer(x)
             x_rec = layer(x_rec)

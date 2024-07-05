@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from dataset.utils import load_classification_dataset
 from models.DynGraphConvRNN import DynGraphModel
 from torch.utils.data import Dataset
+from tsl.data.batch import DisjointBatch
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 from einops import rearrange
@@ -54,24 +55,29 @@ verbose = config.verbose
 edge_indexes, node_labels, graph_labels = load_classification_dataset(config.dataset, config.self_loop)
 
 class DynGraphDataset(Dataset):
-    def __init__(self, edge_indexes, node_labels, graph_labels):
+    def __init__(self, edge_indexes, node_labels):
         self.edge_indexes = edge_indexes
         self.node_labels = node_labels
-        self.graph_labels = graph_labels
 
     def __len__(self):
         return len(self.edge_indexes)
 
     def __getitem__(self, idx):
-        return (tsl.data.data.Data(input={'x': self.node_labels[idx]},
-                                  target={'y': self.graph_labels[idx]},
-                                  edge_index=self.edge_indexes[idx]),
-                self.graph_labels[idx])
+        pattern = dict(x='t n f', y='f')
+        return tsl.data.data.Data(input={'x': self.node_labels[idx]},
+                                  edge_index=self.edge_indexes[idx],
+                                  pattern=pattern)
     
-dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
+dataset = DynGraphDataset(edge_indexes, node_labels)
 
 # Split dataset into train and validation sets
-train_dataset, val_dataset = train_test_split(dataset, test_size=0.2, stratify=dataset.graph_labels, random_state=seed)
+train_x, val_x, train_y, val_y = train_test_split(dataset, graph_labels, test_size=0.2, stratify=graph_labels, random_state=seed)
+
+batch_size = 16
+train_x_batches = [DisjointBatch.from_data_list(train_x[i:i+batch_size]) for i in range(0, len(train_x), batch_size)]
+train_y_batches = [train_y[i:i+batch_size] for i in range(0, len(train_y), batch_size)]
+val_x_batches = [DisjointBatch.from_data_list(val_x[i:i+batch_size]) for i in range(0, len(val_x), batch_size)]
+val_y_batches = [val_y[i:i+batch_size] for i in range(0, len(val_y), batch_size)]
 
 # Define model
 input_size = 1
@@ -103,24 +109,23 @@ counter = 0
 min_delta = 1e-5
 
 for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
-    for data in tqdm(train_dataset, position=1, leave=False):
-        input, label = data
+    for x, y in tqdm(zip(train_x_batches, train_y_batches), position=1, leave=False):
 
         # Move the inputs and labels to the device
-        input = input.to(device)
-        label = label.to(device)
+        input = x.to(device)
+        label = y.to(device)
 
         # Zero the gradients
         optimizer.zero_grad()
 
         # Forward pass
-        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, edge_weight=None, batch=input.batch)
 
         # Compute the loss
         l2_reg = config.weight_decay * torch.sum(torch.pow(model.encoder.K, 2))
         loss_pred = criterion_pred(x.squeeze(), label)
         loss_rec = criterion_rec(x_rec.squeeze(), label)
-        loss_obs = criterion_obs(h_rec, h)
+        loss_obs = torch.stack([criterion_obs(h_rec[i], h[i]) for i in range(len(h))]).mean()
         loss_ridge = loss_obs + l2_reg
         loss_sum = loss_pred + loss_rec + config.beta * loss_ridge
 
@@ -135,25 +140,23 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     # Validation
     total_loss = 0
     total_loss_pred, total_loss_rec, total_loss_ridge, total_loss_obs = 0, 0, 0, 0
-    hs, labels = [], []
+    hs = []
     with torch.no_grad():
-        for data in val_dataset:
-            input, label = data
+        for x, y in zip(val_x_batches, val_y_batches):
 
             # Move the inputs and labels to the device
-            input = input.to(device)
-            label = label.to(device)
+            input = x.to(device)
+            label = y.to(device)
 
             # Forward pass
-            x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
-            hs.append(h.sum(dim=-2).squeeze()) # sum nodes
-            labels.append(label)
+            x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, edge_weight=None, batch=input.batch)
+            hs += [h_b.sum(dim=-2).squeeze() for h_b in h] # sum nodes
 
             # Compute the loss
             l2_reg = config.weight_decay * torch.sum(torch.pow(model.encoder.K, 2))
             loss_pred = criterion_pred(x.squeeze(), label)
             loss_rec = criterion_rec(x_rec.squeeze(), label)
-            loss_obs = criterion_obs(h_rec, h)
+            loss_obs = torch.stack([criterion_obs(h_rec[i], h[i]) for i in range(len(h))]).mean()
             loss_ridge = loss_obs + l2_reg
             loss_sum = loss_pred + loss_rec + config.beta * loss_ridge
 
@@ -165,11 +168,11 @@ for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
             total_loss_obs += loss_obs.item()
 
     # Calculate the average validation loss
-    avg_loss = total_loss / len(val_dataset)
-    avg_loss_pred = total_loss_pred / len(val_dataset)
-    avg_loss_rec = total_loss_rec / len(val_dataset)
-    avg_loss_ridge = total_loss_ridge / len(val_dataset)
-    avg_loss_obs = total_loss_obs / len(val_dataset)
+    avg_loss = total_loss / len(val_x)
+    avg_loss_pred = total_loss_pred / len(val_x)
+    avg_loss_rec = total_loss_rec / len(val_x)
+    avg_loss_ridge = total_loss_ridge / len(val_x)
+    avg_loss_obs = total_loss_obs / len(val_x)
 
     # Log the average validation loss
     wandb.log({"epoch": epoch, "val_loss": avg_loss})
@@ -202,22 +205,21 @@ model.eval()
 # Validation
 outputs, hs_val, labels_val = [], [], []
 with torch.no_grad():
-    for data in tqdm(val_dataset, desc='Validation'):
-        input, label = data
+    for x, y in tqdm(zip(val_x_batches, val_y_batches), desc='Validation'):
 
         # Move the inputs and labels to the device
-        input = input.to(device)
-        label = label.to(device)
+        input = x.to(device)
+        label = y.to(device)
 
         # Forward pass
-        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        x, h, x_rec, h_rec = model(input.input.x.unsqueeze(0), input.edge_index, edge_weight=None, batch=input.batch)
         outputs.append(x.squeeze())
-        hs_val.append(h.sum(dim=-2).squeeze()) # sum nodes
+        hs_val += [h_b.sum(dim=-2).squeeze() for h_b in h] # sum nodes
         labels_val.append(label)
 
 # Compute binary classification accuracy
-outputs = torch.stack(outputs)
-labels_val = torch.stack(labels_val)
+outputs = torch.cat(outputs)
+labels_val = torch.cat(labels_val)
 predictions = torch.sigmoid(outputs) > 0.5
 accuracy = (predictions == labels_val).sum().item() / len(labels_val)
 wandb.log({"accuracy": accuracy})
