@@ -375,8 +375,8 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
         label = label.to(device)
 
         # Run the model
-        output, h = model(input.input.x.unsqueeze(0), input.edge_index, None)
-        outputs.append(output.squeeze().detach().cpu())
+        x, h, _, _ = model(input.input.x.unsqueeze(0), input.edge_index, None)
+        outputs.append(x.squeeze().detach().cpu())
         states.append(h.sum(dim=-2).squeeze().detach().cpu())
         labels.append(label.detach().cpu())
         node_states.append(h.squeeze().detach().cpu())        
