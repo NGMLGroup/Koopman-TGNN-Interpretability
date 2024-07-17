@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
+from einops import rearrange
 
 
 def threshold_based_detection(signal, ground_truth, threshold=None):
@@ -43,7 +44,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None):
     return result
     
 
-def windowing_analysis(signal, ground_truth, window_size=10, threshold=None):
+def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
     """
     Define a threshold that captures significant changes in the derivative of the
     moving average of the signal.
@@ -165,7 +166,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5):
     stat, MW_U_test_p_value = mannwhitneyu(gt_derivative_values, random_derivative_values, alternative='greater')
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
-    return {'p_value': MW_U_test_p_value}
+    return {'mw_p_value': MW_U_test_p_value}
 
 
 def ml_probes(signal, ground_truth, seed=42, verbose=False):
@@ -187,30 +188,32 @@ def ml_probes(signal, ground_truth, seed=42, verbose=False):
     
     # Extract features and labels
     window_size = 5
-    half_window = window_size // 2
 
     # Compute derivative and stack features
-    derivative = np.gradient(signal)
-    signal = signal[:len(derivative)]  # Match the length of the derivative
+    derivative = np.gradient(signal, axis=1)
+    signal = signal[:derivative.shape[1]]  # Match the length of the derivative
 
-    features = np.stack((signal, derivative), axis=-1)
+    features = np.concatenate((signal, derivative), axis=-1)
 
     def extract_features(features, idx, window_size):
-        half_window = window_size // 2
-        start = max(0, idx - half_window)
-        end = min(len(signal), idx + half_window + 1)
+        start = idx
+        end = idx + window_size
         
-        return features[start:end]
+        return features[:,start:end,:]
 
     inputs = []
-    for idx in range(features.shape[0]):
+    for idx in range(features.shape[1] - window_size + 1):
         inputs.append(extract_features(features, idx, window_size))
 
     inputs = np.array(inputs)
-    labels = ground_truth[:len(derivative)]  # Match the length of features
+    labels = ground_truth[:,:inputs.shape[0]]  # Match the length of features
+    labels = np.heaviside(labels, 0)
+
+    inputs = rearrange(inputs, 'b t w f -> (b t) (w f)')
+    labels = rearrange(labels, 'b t -> (b t) 1')
 
     # Split data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.3, random_state=seed)
+    X_train, X_test, y_train, y_test = train_test_split(inputs, labels, test_size=0.3, random_state=seed)
 
     # Train a Random Forest classifier
     random_forest_results = random_forest(X_train, X_test, y_train, y_test, verbose, seed)
@@ -237,7 +240,7 @@ def random_forest(X_train, X_test, y_train, y_test, verbose, seed):
     if verbose:
         print(classification_report(y_test, y_pred))
 
-    random_forest_roc_auc = roc_auc_score(y_test, y_pred_proba)
+    random_forest_roc_auc = roc_auc_score(y_test.squeeze(), y_pred_proba)
 
     return {'random_forest_roc_auc': random_forest_roc_auc}
 
@@ -258,7 +261,7 @@ def logistic_regression(X_train, X_test, y_train, y_test, verbose, seed):
     if verbose:
         print(classification_report(y_test, y_pred))
     
-    log_regr_roc_auc = roc_auc_score(y_test, y_pred_proba)
+    log_regr_roc_auc = roc_auc_score(y_test.squeeze(), y_pred_proba)
     
     return {'log_regr_roc_auc': log_regr_roc_auc}
 
