@@ -270,6 +270,11 @@ def load_classification_dataset(name, b_add_self_loops=True):
 def run_dyn_gesn_classification(file_path, config, device, verbose=False):
     # Load dataset
     edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'], config['add_self_loops'])
+    
+    if config['testing'] == True:
+        edge_indexes = edge_indexes[:50]
+        node_labels = node_labels[:50]
+        graph_labels = graph_labels[:50]
 
     # Define the model
     feat_size = 1
@@ -340,6 +345,12 @@ def run_dyn_gesn_classification(file_path, config, device, verbose=False):
 def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     # Load dataset
     edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'], config['add_self_loops'])
+    
+    if config['testing'] == True:
+        edge_indexes = edge_indexes[:50]
+        node_labels = node_labels[:50]
+        graph_labels = graph_labels[:50]
+
     dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
 
     # Define the model
@@ -441,9 +452,13 @@ def process_classification_dataset(config, model, device, ignore_file=True, verb
     return dataset, states, node_states, node_labels
 
 
-def ground_truth(dataset_name):
+def ground_truth(dataset_name, testing=False):
     # Load dataset
     edge_indexes, node_labels, _ = load_classification_dataset(dataset_name, False)
+    
+    if testing == True:
+        edge_indexes = edge_indexes[:50]
+        node_labels = node_labels[:50]
 
     nodes_gt, node_sums_gt, times_gt = [], [], []
 
