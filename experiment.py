@@ -1,8 +1,8 @@
 import os
 import random
 import torch
+import wandb
 import numpy as np
-import pandas as pd
 
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -22,11 +22,6 @@ sys.path.append(str(project_root))
 # Select one GPU if more are available
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 
-seed = 42
-random.seed(seed)
-torch.manual_seed(seed)
-np.random.seed(seed)
-
 if torch.cuda.is_available():
     device = torch.device('cuda')
 else:
@@ -38,13 +33,23 @@ config = {
         'rnn_layers': 5,
         'readout_layers': 1,
         'cell_type': 'lstm',
-        'dim_red': 64,
-        'add_self_loops': False,
-        'verbose': True,
+        'dim_red': 10,
+        'add_self_loops': False, # Too memory-demanding
+        'verbose': False,
         'cat_states_layers': True,
         'K_type': 'data', # 'model',
-        'testing': True
+        'testing': False,
+        'seed': 42,
+        'threshold': None,
+        'window_size': 5,
         }
+
+wandb.init(project="koopman", config=config)
+
+seed = config['seed']
+random.seed(seed)
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 
 # Load the dataset
@@ -53,7 +58,11 @@ train_X, val_X, train_y, val_y = train_test_split(states.inputs, states.targets,
 
 # Compare with ground-truth labels
 nodes_gt, node_sums_gt, times_gt = ground_truth(config['dataset'], config['testing'])
-train_node_sums_gt, val_node_sums_gt, train_times_gt, val_times_gt = train_test_split(torch.stack(node_sums_gt).numpy(), torch.stack(times_gt).numpy(), test_size=0.2, random_state=seed)
+train_node_sums_gt, val_node_sums_gt, train_times_gt, val_times_gt = train_test_split(
+    torch.stack(node_sums_gt).numpy(), 
+    torch.stack(times_gt).numpy(), 
+    test_size=0.2, 
+    random_state=seed)
 
 # Compute Koopman operator
 emb_engine, K = get_K(config, train_X)
@@ -83,12 +92,14 @@ r_mann = []
 
 mode_idx = 0
 for g in tqdm(range(val_modes.shape[0])):
-    if val_y[g]==0:
+    if val_y[g]==0 or (val_times_gt[g] == 0).all():
         continue
-    thr_dict = threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g])
+    thr_dict = threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g], 
+                                         threshold=config['threshold'])
     thr_prec, thr_rec, thr_f1 = thr_dict[columns[0]], thr_dict[columns[1]], thr_dict[columns[2]]
 
-    win_dict = windowing_analysis(val_modes[g,:,mode_idx], val_times_gt[g])
+    win_dict = windowing_analysis(val_modes[g,:,mode_idx], val_times_gt[g], 
+                                  window_size=config['window_size'], threshold=config['threshold'])
     win_prec, win_rec, win_f1 = win_dict[columns[3]], win_dict[columns[4]], win_dict[columns[5]]
 
     r_thr_prec.append(thr_prec)
@@ -99,7 +110,13 @@ for g in tqdm(range(val_modes.shape[0])):
     r_win_f1.append(win_f1)
 
     r_cross.append(cross_correlation(val_modes[g,:,mode_idx], val_times_gt[g])[columns[6]])
-    r_mann.append(mann_whitney_test(val_modes[g,:,mode_idx], val_times_gt[g])[columns[7]])
+    r_mann.append(mann_whitney_test(val_modes[g,:,mode_idx], val_times_gt[g], 
+                                    window_size=config['window_size'])[columns[7]])
+
+ml_results = ml_probes(modes[states.targets==1], 
+                       torch.stack(times_gt).numpy()[states.targets==1], 
+                       seed=seed, 
+                       verbose=config['verbose'])
 
 # Add results to a new row in the dataframe
 df['thr_precision'] = np.mean(r_thr_prec)
@@ -111,9 +128,10 @@ df['window_f1_score'] = np.mean(r_win_f1)
 df['max_corr_lag_error'] = np.mean(r_cross)
 df['mw_p_value'] = np.mean(r_mann)
 
-ml_results = ml_probes(modes, torch.stack(times_gt).numpy(), seed=seed, verbose=True)
-
 for k, v in ml_results.items():
     df[k] = v
 
-print(df)
+wandb.log(df)
+
+if config['verbose']:
+    print(df)
