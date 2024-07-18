@@ -1,4 +1,4 @@
-program: metrics.py
+program: experiment.py
 method: grid
 project: "koopman"
 
