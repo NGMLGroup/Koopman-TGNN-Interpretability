@@ -24,6 +24,8 @@ def threshold_based_detection(signal, ground_truth, threshold=None):
     
     if threshold is None:
         threshold = np.mean(derivative) + np.std(derivative)
+    else:
+        threshold = threshold * np.max(derivative)
     
     detected = np.where(np.abs(derivative) > threshold)[0]
 
@@ -31,9 +33,16 @@ def threshold_based_detection(signal, ground_truth, threshold=None):
     false_positives = np.setdiff1d(detected, ground_truth)
     false_negatives = np.setdiff1d(ground_truth, detected)
 
-    precision = len(true_positives) / (len(true_positives) + len(false_positives))
-    recall = len(true_positives) / (len(true_positives) + len(false_negatives))
-    f1_score = 2 * (precision * recall) / (precision + recall)
+    precision_denominator = len(true_positives) + len(false_positives)
+    recall_denominator = len(true_positives) + len(false_negatives)
+
+    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
+    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
+
+    # Calculate F1 score with a check to avoid division by zero
+    f1_score_denominator = precision + recall
+    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+
 
     result = {
         'thr_precision': precision,
@@ -67,6 +76,8 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
     
     if threshold is None:
         threshold = np.mean(derivative) + np.std(derivative)
+    else:
+        threshold = threshold * np.max(derivative)
     
     detected = np.where(np.abs(derivative) > threshold)[0]
 
@@ -74,9 +85,15 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
     false_positives = np.setdiff1d(detected, ground_truth)
     false_negatives = np.setdiff1d(ground_truth, detected)
 
-    precision = len(true_positives) / (len(true_positives) + len(false_positives))
-    recall = len(true_positives) / (len(true_positives) + len(false_negatives))
-    f1_score = 2 * (precision * recall) / (precision + recall)
+    precision_denominator = len(true_positives) + len(false_positives)
+    recall_denominator = len(true_positives) + len(false_negatives)
+
+    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
+    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
+
+    # Calculate F1 score with a check to avoid division by zero
+    f1_score_denominator = precision + recall
+    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
 
     result = {
         'window_precision': precision,
@@ -191,7 +208,7 @@ def ml_probes(signal, ground_truth, seed=42, verbose=False):
 
     # Compute derivative and stack features
     derivative = np.gradient(signal, axis=1)
-    signal = signal[:derivative.shape[1]]  # Match the length of the derivative
+    signal = signal[:,:derivative.shape[1]]  # Match the length of the derivative
 
     features = np.concatenate((signal, derivative), axis=-1)
 
@@ -210,7 +227,7 @@ def ml_probes(signal, ground_truth, seed=42, verbose=False):
     labels = np.heaviside(labels, 0)
 
     inputs = rearrange(inputs, 'b t w f -> (b t) (w f)')
-    labels = rearrange(labels, 'b t -> (b t) 1')
+    labels = rearrange(labels, 'b t -> (b t)')
 
     # Split data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(inputs, labels, test_size=0.3, random_state=seed)
