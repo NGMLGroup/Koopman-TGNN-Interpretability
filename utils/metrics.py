@@ -2,9 +2,10 @@ import numpy as np
 from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
 from einops import rearrange
+import matplotlib.pyplot as plt
 
 
-def threshold_based_detection(signal, ground_truth, threshold=None):
+def threshold_based_detection(signal, ground_truth, threshold=None, plot=False):
     """
     Define a threshold that captures significant changes in the derivative.
     Compare the time instants where the derivative exceeds this threshold with the ground-truth instants.
@@ -15,9 +16,11 @@ def threshold_based_detection(signal, ground_truth, threshold=None):
         ground_truth (np.ndarray): The ground-truth signal.
         threshold (float): The threshold to apply, as percentage of the maximum derivative.
                             If `None`, it will be computed as mean+std of the derivative.
+        plot (bool): Whether to plot the signal and derivative.
 
     Returns:
         dict: precision, recall, F1-score.
+        figure: The plot of the signal and derivative.
     """
 
     derivative = np.gradient(signal)
@@ -43,17 +46,41 @@ def threshold_based_detection(signal, ground_truth, threshold=None):
     f1_score_denominator = precision + recall
     f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
 
-
     result = {
         'thr_precision': precision,
         'thr_recall': recall,
         'thr_f1_score': f1_score
     }
 
+    if plot:
+
+        # Plot the signal
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6))
+        fig.suptitle('Threshold-based Detection')
+
+        axs[0].plot(signal, label='Signal')
+        axs[0].plot(ground_truth, label='Ground Truth')
+        axs[0].plot(np.where(np.abs(derivative) > threshold, signal, np.nan), 'r.', label='Detected')
+        axs[0].set_xlabel('Time')
+        axs[0].legend()
+
+        axs[1].plot(derivative, label='Derivative')
+        axs[1].plot(ground_truth, label='Ground Truth')
+        axs[1].plot(np.where(np.abs(derivative) > threshold, derivative, np.nan), 'r.', label='Detected')
+        axs[1].set_xlabel('Time')
+        axs[1].legend()
+
+        # Print the results
+        axs[1].text(0, -0.3, f"Precision: {result['thr_precision']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.4, -0.3, f"Recall: {result['thr_recall']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.8, -0.3, f"F1-score: {result['thr_f1_score']:.2f}", transform=axs[1].transAxes)
+
+        return fig, result
+
     return result
     
 
-def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
+def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot=False):
     """
     Define a threshold that captures significant changes in the derivative of the
     moving average of the signal.
@@ -65,9 +92,11 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
         ground_truth (np.ndarray): The ground-truth signal.
         threshold (float): The threshold to apply, as percentage of the maximum derivative.
                             If `None`, it will be computed as mean+std of the derivative.
+        plot (bool): Whether to plot the signal and derivative.
 
     Returns:
         dict: precision, recall, F1-score.
+        figure: The plot of the signal and derivative.
     """
 
     # Moving average
@@ -101,10 +130,35 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None):
         'window_f1_score': f1_score
     }
 
+    if plot:
+
+        # Plot the signal
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6))
+        fig.suptitle('Windowing Analysis')
+
+        axs[0].plot(signal, label='Signal')
+        axs[0].plot(ground_truth, label='Ground Truth')
+        axs[0].plot(np.where(np.abs(derivative) > threshold, signal, np.nan), 'r.', label='Detected')
+        axs[0].set_xlabel('Time')
+        axs[0].legend()
+
+        axs[1].plot(derivative, label='Derivative')
+        axs[1].plot(ground_truth, label='Ground Truth')
+        axs[1].plot(np.where(np.abs(derivative) > threshold, derivative, np.nan), 'r.', label='Detected')
+        axs[1].set_xlabel('Time')
+        axs[1].legend()
+
+        # Print the results
+        axs[1].text(0, -0.3, f"Precision: {result['window_precision']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.4, -0.3, f"Recall: {result['window_recall']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.8, -0.3, f"F1-score: {result['window_f1_score']:.2f}", transform=axs[1].transAxes)
+
+        return fig, result
+
     return result
     
 
-def cross_correlation(signal, ground_truth):
+def cross_correlation(signal, ground_truth, plot=False):
     """
     Compute the derivative of your signal.
     Compute the cross-correlation between the binary ground-truth signal and the derivative of the signal.
@@ -113,10 +167,12 @@ def cross_correlation(signal, ground_truth):
     Args:
         signal (np.ndarray): The time signal.
         ground_truth (np.ndarray): The ground-truth signal.
+        plot (bool, optional): Whether to plot the cross-correlation. Defaults to False.
 
     Returns:
         dict: The absolute value of the lag with the highest cross-correlation, 
                 i.e. how far the actual peak is from the desired lag of 0.
+        figure: The plot of the signal and cross-correlation.
     """
 
     derivative = np.gradient(signal)
@@ -127,17 +183,35 @@ def cross_correlation(signal, ground_truth):
     # Compute cross-correlation
     cross_correlation = np.correlate(derivative, ground_truth, mode='same')
 
-    # The full cross-correlation array length is (2N-1) where N is the length of the derivative
-    lags = np.arange(-len(derivative) + 1, len(derivative))
+    lags = np.arange(len(cross_correlation))
     
     # Identify the lag with the highest cross-correlation value
     max_corr_lag = lags[np.argmax(cross_correlation)]
     max_corr_lag_error = np.abs(max_corr_lag)
 
+    if plot:
+
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6))
+        fig.suptitle('Cross-correlation Analysis')
+
+        axs[0].plot(signal, label='Signal')
+        axs[0].plot(ground_truth, label='Ground Truth')
+        axs[0].set_xlabel('Time')
+        axs[0].legend()
+
+        axs[1].plot(lags, cross_correlation, label='Cross-correlation')
+        axs[1].axvline(max_corr_lag, color='r', linestyle='--', label='Max Corr Lag')
+        axs[1].set_xlabel('Lag')
+        axs[1].legend()
+
+        axs[1].text(0, -0.3, f"Max Corr Lag Error: {max_corr_lag_error}", transform=axs[1].transAxes)
+
+        return fig, {'max_corr_lag_error': max_corr_lag_error}
+
     return {'max_corr_lag_error': max_corr_lag_error}
 
 
-def mann_whitney_test(signal, ground_truth, window_size=5):
+def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
     """
     Statistical test to check if the derivative values around ground-truth instants are significantly different
     from those around random instants. This is done using the Mann-Whitney U test.
@@ -146,9 +220,11 @@ def mann_whitney_test(signal, ground_truth, window_size=5):
         signal (np.ndarray): The time signal.
         ground_truth (np.ndarray): The ground-truth signal.
         window_size (int, optional): The window size around each instant to consider. Defaults to 5.
+        plot (bool, optional): Whether to plot the Mann-Whitney U test. Defaults to False.
 
     Returns:
         dict: The p-value of the Mann-Whitney U test.
+        figure: The histogram of derivative values around ground-truth and random instants.
     """
 
     # Ground-truth instants
@@ -181,6 +257,20 @@ def mann_whitney_test(signal, ground_truth, window_size=5):
 
     # Perform Mann-Whitney U test
     stat, MW_U_test_p_value = mannwhitneyu(gt_derivative_values, random_derivative_values, alternative='greater')
+
+    if plot:
+
+        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
+        fig.suptitle('Mann-Whitney U Test')
+
+        axs.hist(gt_derivative_values, bins=20, alpha=0.5, label='Ground Truth')
+        axs.hist(random_derivative_values, bins=20, alpha=0.5, label='Random')
+        axs.set_xlabel('Derivative Values')
+        axs.legend()
+
+        axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
+
+        return fig, {'mw_p_value': MW_U_test_p_value}
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
     return {'mw_p_value': MW_U_test_p_value}

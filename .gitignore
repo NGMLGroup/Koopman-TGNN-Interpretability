@@ -17,6 +17,7 @@ wandb
 *.gephi
 *.h5
 plots/graphs
+plots/time_gt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
