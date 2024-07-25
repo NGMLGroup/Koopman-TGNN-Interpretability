@@ -5,7 +5,7 @@ from einops import rearrange
 import matplotlib.pyplot as plt
 
 
-def threshold_based_detection(signal, ground_truth, threshold=None, plot=False):
+def threshold_based_detection(signal, ground_truth, threshold=None, window_size=5, plot=False):
     """
     Define a threshold that captures significant changes in the derivative.
     Compare the time instants where the derivative exceeds this threshold with the ground-truth instants.
@@ -16,6 +16,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, plot=False):
         ground_truth (np.ndarray): The ground-truth signal.
         threshold (float): The threshold to apply, as percentage of the maximum derivative.
                             If `None`, it will be computed as mean+std of the derivative.
+        window_size (int): The window size around each instant to consider.
         plot (bool): Whether to plot the signal and derivative.
 
     Returns:
@@ -31,6 +32,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, plot=False):
         threshold = threshold * np.max(derivative)
     
     detected = np.where(np.abs(derivative) > threshold)[0]
+
+    filter = np.ones(window_size)
+    ground_truth = np.convolve(ground_truth, filter, mode='same')
+    ground_truth = np.where(ground_truth > 0)[0]
 
     true_positives = np.intersect1d(detected, ground_truth)
     false_positives = np.setdiff1d(detected, ground_truth)
@@ -90,6 +95,8 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     Args:
         signal (np.ndarray): The time signal.
         ground_truth (np.ndarray): The ground-truth signal.
+        window_size (int): The window size for the moving average.
+                            And the window size around each instant to consider.
         threshold (float): The threshold to apply, as percentage of the maximum derivative.
                             If `None`, it will be computed as mean+std of the derivative.
         plot (bool): Whether to plot the signal and derivative.
@@ -109,6 +116,10 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         threshold = threshold * np.max(derivative)
     
     detected = np.where(np.abs(derivative) > threshold)[0]
+    
+    filter = np.ones(window_size)
+    ground_truth = np.convolve(ground_truth, filter, mode='same')
+    ground_truth = np.where(ground_truth > 0)[0]
 
     true_positives = np.intersect1d(detected, ground_truth)
     false_positives = np.setdiff1d(detected, ground_truth)
