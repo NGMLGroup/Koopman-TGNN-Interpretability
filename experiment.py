@@ -90,7 +90,7 @@ r_win_prec, r_win_rec, r_win_f1 = [], [], []
 r_cross = []
 r_mann = []
 
-mode_idx = 0
+mode_idx = 1
 for g in tqdm(range(val_modes.shape[0])):
     if val_y[g]==0 or (val_times_gt[g] == 0).all():
         continue
