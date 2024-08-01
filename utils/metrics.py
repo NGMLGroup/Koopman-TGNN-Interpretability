@@ -1,3 +1,4 @@
+import random
 import numpy as np
 from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
@@ -30,16 +31,17 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         threshold = np.mean(derivative) + np.std(derivative)
     else:
         threshold = threshold * np.max(derivative)
-    
-    detected = np.where(np.abs(derivative) > threshold)[0]
 
     filter = np.ones(window_size)
-    ground_truth = np.convolve(ground_truth, filter, mode='same')
-    ground_truth = np.where(ground_truth > 0)[0]
+    ground_truth_c = np.convolve(ground_truth, filter, mode='valid')
+    ground_truth_i = np.where(ground_truth_c > 0)[0]
+    
+    derivative = derivative[window_size//2:-window_size//2+1]
+    detected = np.where(np.abs(derivative) > threshold)[0]
 
-    true_positives = np.intersect1d(detected, ground_truth)
-    false_positives = np.setdiff1d(detected, ground_truth)
-    false_negatives = np.setdiff1d(ground_truth, detected)
+    true_positives = np.intersect1d(detected, ground_truth_i)
+    false_positives = np.setdiff1d(detected, ground_truth_i)
+    false_negatives = np.setdiff1d(ground_truth_i, detected)
 
     precision_denominator = len(true_positives) + len(false_positives)
     recall_denominator = len(true_positives) + len(false_negatives)
@@ -63,15 +65,18 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         fig, axs = plt.subplots(2, 1, figsize=(10, 6))
         fig.suptitle('Threshold-based Detection')
 
-        axs[0].plot(signal, label='Signal')
-        axs[0].plot(ground_truth, label='Ground Truth')
-        axs[0].plot(np.where(np.abs(derivative) > threshold, signal, np.nan), 'r.', label='Detected')
+        sig = signal[window_size//2:-window_size//2+1]
+        axs[0].plot(sig, label='Signal')
+        axs[0].plot(ground_truth_c, label='Ground Truth')
+        det = np.zeros_like(ground_truth_c)
+        det[detected] = 1
+        axs[0].plot(np.where(det, sig, np.nan), 'r.', label='Detected')
         axs[0].set_xlabel('Time')
         axs[0].legend()
 
         axs[1].plot(derivative, label='Derivative')
-        axs[1].plot(ground_truth, label='Ground Truth')
-        axs[1].plot(np.where(np.abs(derivative) > threshold, derivative, np.nan), 'r.', label='Detected')
+        axs[1].plot(ground_truth_c, label='Ground Truth')
+        axs[1].plot(np.where(det, derivative, np.nan), 'r.', label='Detected')
         axs[1].set_xlabel('Time')
         axs[1].legend()
 
@@ -82,7 +87,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
 
         return fig, result
 
-    return result
+    return None, result
     
 
 def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot=False):
@@ -107,7 +112,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     """
 
     # Moving average
-    signal = np.convolve(signal, np.ones(window_size)/window_size, mode='same')
+    signal = np.convolve(signal, np.ones(window_size)/window_size, mode='valid')
     derivative = np.gradient(signal)
     
     if threshold is None:
@@ -118,12 +123,12 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     detected = np.where(np.abs(derivative) > threshold)[0]
     
     filter = np.ones(window_size)
-    ground_truth = np.convolve(ground_truth, filter, mode='same')
-    ground_truth = np.where(ground_truth > 0)[0]
+    ground_truth_c = np.convolve(ground_truth, filter, mode='valid')
+    ground_truth_i = np.where(ground_truth_c > 0)[0]
 
-    true_positives = np.intersect1d(detected, ground_truth)
-    false_positives = np.setdiff1d(detected, ground_truth)
-    false_negatives = np.setdiff1d(ground_truth, detected)
+    true_positives = np.intersect1d(detected, ground_truth_i)
+    false_positives = np.setdiff1d(detected, ground_truth_i)
+    false_negatives = np.setdiff1d(ground_truth_i, detected)
 
     precision_denominator = len(true_positives) + len(false_positives)
     recall_denominator = len(true_positives) + len(false_negatives)
@@ -148,14 +153,16 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         fig.suptitle('Windowing Analysis')
 
         axs[0].plot(signal, label='Signal')
-        axs[0].plot(ground_truth, label='Ground Truth')
-        axs[0].plot(np.where(np.abs(derivative) > threshold, signal, np.nan), 'r.', label='Detected')
+        axs[0].plot(ground_truth_c, label='Ground Truth')
+        det = np.zeros_like(ground_truth_c)
+        det[detected] = 1
+        axs[0].plot(np.where(det, signal, np.nan), 'r.', label='Detected')
         axs[0].set_xlabel('Time')
         axs[0].legend()
 
         axs[1].plot(derivative, label='Derivative')
-        axs[1].plot(ground_truth, label='Ground Truth')
-        axs[1].plot(np.where(np.abs(derivative) > threshold, derivative, np.nan), 'r.', label='Detected')
+        axs[1].plot(ground_truth_c, label='Ground Truth')
+        axs[1].plot(np.where(det, derivative, np.nan), 'r.', label='Detected')
         axs[1].set_xlabel('Time')
         axs[1].legend()
 
@@ -166,7 +173,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         return fig, result
 
-    return result
+    return None, result
     
 
 def cross_correlation(signal, ground_truth, plot=False):
@@ -206,6 +213,7 @@ def cross_correlation(signal, ground_truth, plot=False):
         fig.suptitle('Cross-correlation Analysis')
 
         axs[0].plot(signal, label='Signal')
+        axs[0].plot(derivative, label='Derivative')
         axs[0].plot(ground_truth, label='Ground Truth')
         axs[0].set_xlabel('Time')
         axs[0].legend()
@@ -219,7 +227,7 @@ def cross_correlation(signal, ground_truth, plot=False):
 
         return fig, {'max_corr_lag_error': max_corr_lag_error}
 
-    return {'max_corr_lag_error': max_corr_lag_error}
+    return None, {'max_corr_lag_error': max_corr_lag_error}
 
 
 def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
@@ -284,7 +292,77 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
         return fig, {'mw_p_value': MW_U_test_p_value}
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
-    return {'mw_p_value': MW_U_test_p_value}
+    return None, {'mw_p_value': MW_U_test_p_value}
+
+
+def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
+    """
+    Statistical test to check if the derivative values around ground-truth instants are significantly different
+    from those around random instants. This is done using the Mann-Whitney U test.
+
+    Args:
+        signal (np.ndarray): The time signals, shape (b, t, f).
+        ground_truth (np.ndarray): The ground-truth signals, shape (b, t).
+        window_size (int, optional): The window size around each instant to consider. Defaults to 5.
+        plot (bool, optional): Whether to plot the Mann-Whitney U test. Defaults to False.
+
+    Returns:
+        dict: The p-value of the Mann-Whitney U test.
+        figure: The histogram of derivative values around ground-truth and random instants.
+    """
+
+    # Ground-truth instants
+    ground_truth_instants = np.argwhere(ground_truth)
+
+    # Compute derivative and stack features
+    derivative = np.gradient(signal, axis=1)
+
+    # Define a window size around each instant
+    half_window = window_size // 2
+
+    # Extract derivative values around ground-truth instants
+    gt_derivative_values = []
+    for gt in ground_truth_instants:
+        b, t = gt
+        window_start = max(0, t - half_window)
+        window_end = min(derivative.shape[1], t + half_window)
+        gt_derivative_values.extend(np.abs(derivative[b,window_start:window_end]))
+
+    # Extract derivative values around random instants
+    # Choose a number of random instants, here we choose the same number as ground-truth instants for consistency
+    num_random_instants = len(ground_truth_instants)
+    # Remove instants already used for ground-truth
+    all_indices = np.argwhere(ground_truth >= 0)
+    excl_indices = {tuple(gt) for gt in ground_truth_instants}
+    excl_indices = set(excl_indices)
+    eligible_indices = [(b,t) for (b,t) in all_indices if (b,t) not in excl_indices]
+    random_instants = random.sample(eligible_indices, num_random_instants)
+    random_derivative_values = []
+    for ri in random_instants:
+        b, t = ri
+        window_start = max(0, t - half_window)
+        window_end = min(derivative.shape[1], t + half_window)
+        random_derivative_values.extend(np.abs(derivative[b,window_start:window_end]))
+
+    # Perform Mann-Whitney U test
+    stat, MW_U_test_p_value = mannwhitneyu(gt_derivative_values, random_derivative_values, alternative='greater')
+
+    if plot:
+
+        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
+        fig.suptitle('Mann-Whitney U Test')
+
+        axs.hist(gt_derivative_values, bins=20, alpha=0.5, label='Ground Truth')
+        axs.hist(random_derivative_values, bins=20, alpha=0.5, label='Random')
+        axs.set_xlabel('Derivative Values')
+        axs.legend()
+
+        axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
+
+        return fig, {'mw_p_value_dt': MW_U_test_p_value}
+
+    # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
+    return None, {'mw_p_value_dt': MW_U_test_p_value}
 
 
 def ml_probes(signal, ground_truth, seed=42, verbose=False):
