@@ -18,6 +18,8 @@ wandb
 *.h5
 plots/graphs
 plots/time_gt
+*csv
+*xlsx
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
