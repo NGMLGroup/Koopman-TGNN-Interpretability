@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from dataset.utils import (process_classification_dataset,
                             ground_truth)
@@ -35,6 +36,7 @@ config = {
         'seed': 42,
         'threshold': None,
         'window_size': 5,
+        'plot': True
         }
 
 seed = config['seed']
@@ -75,7 +77,13 @@ mode_idx = 1
 columns = ['thr_precision', 'thr_recall', 'thr_f1_score',
            'window_precision', 'window_recall', 'window_f1_score',
            'max_corr_lag_error',
-           'mw_p_value']
+           'mw_p_value',
+           'mw_p_value_dt']
+
+r_thr_prec, r_thr_rec, r_thr_f1 = [], [], []
+r_win_prec, r_win_rec, r_win_f1 = [], [], []
+r_cross = []
+r_mann = []
 
 for g in tqdm(range(len(val_modes)), desc='Graphs', leave=False):
 
@@ -84,23 +92,65 @@ for g in tqdm(range(len(val_modes)), desc='Graphs', leave=False):
 
     fig, thr_dict = threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g], 
                                             threshold=config['threshold'],
-                                            plot=True)
-    fig.savefig(f'plots/time_gt/{g}_thr_{mode_idx}.png')
+                                            plot=config['plot'])
+    if fig is not None:
+        fig.savefig(f'plots/time_gt/{g}_thr_{mode_idx}.png')
     
     fig, win_dict = windowing_analysis(val_modes[g,:,mode_idx], val_times_gt[g],
                                         window_size=config['window_size'],
                                         threshold=config['threshold'],
-                                        plot=True)
-    fig.savefig(f'plots/time_gt/{g}_win_{mode_idx}.png')
+                                        plot=config['plot'])
+    if fig is not None:
+        fig.savefig(f'plots/time_gt/{g}_win_{mode_idx}.png')
     
     fig, cc_dict = cross_correlation(val_modes[g,:,mode_idx], val_times_gt[g],
-                                     plot=True)
-    fig.savefig(f'plots/time_gt/{g}_cc_{mode_idx}.png')
+                                     plot=config['plot'])
+    if fig is not None:
+        fig.savefig(f'plots/time_gt/{g}_cc_{mode_idx}.png')
     
     fig, mw_dict = mann_whitney_test(val_modes[g,:,mode_idx], val_times_gt[g], 
                                     window_size=config['window_size'],
-                                    plot=True)
-    fig.savefig(f'plots/time_gt/{g}_mw_{mode_idx}.png')
-
+                                    plot=config['plot'])
+    if fig is not None:
+        fig.savefig(f'plots/time_gt/{g}_mw_{mode_idx}.png')
+    
     plt.close('all')
+    
+    thr_prec, thr_rec, thr_f1 = thr_dict[columns[0]], thr_dict[columns[1]], thr_dict[columns[2]]
+    win_prec, win_rec, win_f1 = win_dict[columns[3]], win_dict[columns[4]], win_dict[columns[5]]
+    cc_lag = cc_dict[columns[6]]
+    mw_p = mw_dict[columns[7]]
+    
+    r_thr_prec.append(thr_prec)
+    r_thr_rec.append(thr_rec)
+    r_thr_f1.append(thr_f1)
+    r_win_prec.append(win_prec)
+    r_win_rec.append(win_rec)
+    r_win_f1.append(win_f1)
+    r_cross.append(cc_lag)
+    r_mann.append(mw_p)
+
+# Mann-Whitney U test on whole dataset
+fig, mw_p_value_dt = mann_whitney_test_dataset(val_modes[val_y==1,:,mode_idx], 
+                                                    np.stack(val_times_gt)[val_y==1], 
+                                                    window_size=config['window_size'],
+                                                    plot=config['plot'])
+if fig is not None:
+    fig.savefig(f'plots/time_gt/dataset_mw_{mode_idx}.png')
+
+# Create a dataframe with the results
+results = pd.DataFrame({
+    'thr_precision': r_thr_prec,
+    'thr_recall': r_thr_rec,
+    'thr_f1_score': r_thr_f1,
+    'window_precision': r_win_prec,
+    'window_recall': r_win_rec,
+    'window_f1_score': r_win_f1,
+    'max_corr_lag_error': r_cross,
+    'mw_p_value': r_mann,
+    'mw_p_value_dt': mw_p_value_dt[columns[8]]
+})
+
+# Save the dataframe to a CSV file in a new sheet
+results.to_csv('results.csv', header=columns, index=False)
 
