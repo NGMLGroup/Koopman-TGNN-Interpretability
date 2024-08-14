@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 
+from einops import rearrange
+
 
 def get_K(config, states):
     if config['K_type'] == 'model':
@@ -45,7 +47,6 @@ def get_K_from_data(states, dim_red):
 
 
 def change_basis(states, v, emb_engine):
-    from einops import rearrange
 
     assert states.ndim == 3, 'States should have shape [batch or nodes, time, features]'
     b, t, f = states.shape
@@ -56,3 +57,21 @@ def change_basis(states, v, emb_engine):
     states = np.dot(states, v)
 
     return states
+
+
+def get_K_from_SINDy(edge_index, node_state, dim_red):
+    from koopman.sindy import SINDy
+
+    # Compute Koopman operator with SINDy
+    method = 'PCA'
+    sindy = SINDy(node_state, edge_index, k=dim_red, emb=method)
+
+    K = sindy.fit()
+
+    # Remove "F" dimension
+    num_blocks = K.shape[0] // dim_red
+    sum_K = np.array([np.sum(K[i*dim_red:(i+1)*dim_red], axis=0) for i in range(num_blocks)])
+    num_blocks = K.shape[1] // dim_red
+    sum_K = np.stack([np.sum(sum_K[:,i*dim_red:(i+1)*dim_red], axis=1) for i in range(num_blocks)], axis=1)
+
+    return sum_K

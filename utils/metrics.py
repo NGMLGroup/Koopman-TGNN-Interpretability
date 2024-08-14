@@ -1,9 +1,11 @@
 import random
+import matplotlib
 import numpy as np
+import matplotlib.pyplot as plt
+
 from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
 from einops import rearrange
-import matplotlib.pyplot as plt
 
 
 def threshold_based_detection(signal, ground_truth, threshold=None, window_size=5, plot=False):
@@ -21,7 +23,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         plot (bool): Whether to plot the signal and derivative.
 
     Returns:
-        dict: precision, recall, F1-score.
+        dict: precision, recall, F1-score, baseline.
         figure: The plot of the signal and derivative.
     """
 
@@ -53,10 +55,14 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     f1_score_denominator = precision + recall
     f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
 
+    # Baseline F1 score
+    baseline_f1 = F1_baseline(ground_truth_i)
+
     result = {
         'thr_precision': precision,
         'thr_recall': recall,
-        'thr_f1_score': f1_score
+        'thr_f1_score': f1_score,
+        'thr_baseline_f1': baseline_f1
     }
 
     if plot:
@@ -107,7 +113,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         plot (bool): Whether to plot the signal and derivative.
 
     Returns:
-        dict: precision, recall, F1-score.
+        dict: precision, recall, F1-score, baseline.
         figure: The plot of the signal and derivative.
     """
 
@@ -140,10 +146,14 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     f1_score_denominator = precision + recall
     f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
 
+    # Baseline F1 score
+    baseline_f1 = F1_baseline(ground_truth_i)
+
     result = {
         'window_precision': precision,
         'window_recall': recall,
-        'window_f1_score': f1_score
+        'window_f1_score': f1_score,
+        'window_baseline_f1': baseline_f1
     }
 
     if plot:
@@ -174,6 +184,35 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         return fig, result
 
     return None, result
+
+
+def F1_baseline(ground_truth):
+    """
+    Calculate the F1 score of a baseline that always predicts True.
+
+    Args:
+        ground_truth (np.ndarray): The ground-truth signal.
+    
+    Returns:
+        float: The F1 score of the baseline.
+    """
+
+    detected = np.ones_like(ground_truth)
+    true_positives = np.intersect1d(detected, ground_truth)
+    false_positives = np.setdiff1d(detected, ground_truth)
+    false_negatives = np.setdiff1d(ground_truth, detected)
+
+    precision_denominator = len(true_positives) + len(false_positives)
+    recall_denominator = len(true_positives) + len(false_negatives)
+
+    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
+    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
+
+    # Calculate F1 score with a check to avoid division by zero
+    f1_score_denominator = precision + recall
+    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+
+    return f1_score
     
 
 def cross_correlation(signal, ground_truth, plot=False):
@@ -460,4 +499,73 @@ def logistic_regression(X_train, X_test, y_train, y_test, verbose, seed):
     log_regr_roc_auc = roc_auc_score(y_test.squeeze(), y_pred_proba)
     
     return {'log_regr_roc_auc': log_regr_roc_auc}
+
+
+def auc_analysis(K, edge_index, edge_gt, plot=False):
+    """
+    Computes the Koopman operator via SINDy and uses it
+    to compute the weights of the graph edges.
+    Then, it computes the ROC AUC score between the edge weights.
+
+    Args:
+        K (np.ndarray): The Koopman operator.
+        edge_index (torch.Tensor): The edge index.
+        edge_gt (np.ndarray): The ground-truth edge index.
+        plot (bool): Whether to plot the graph and ground truth.
+    
+    Returns:
+        dict: The ROC AUC score.
+        figure: The graph and ground truth plots.
+    """
+
+    from sklearn.metrics import roc_auc_score
+    import networkx as nx
+    import torch
+
+    # Compute the weights
+    num_nodes = K.shape[0]
+    weights = np.abs(K[:,2*num_nodes:]).sum(axis=0)
+    
+    # Compute the AUC score
+    auc_score = roc_auc_score(edge_gt, weights)
+
+    if plot:
+        fig, axs = plt.subplots(1, 2, figsize=(16, 7))
+        fig.suptitle(f'Graph AUC Analysis: {auc_score:.2f}')
+        G = nx.DiGraph()
+
+        # Add nodes
+        G.add_nodes_from(range(num_nodes))
+        n_labels = {i: str(i) for i in range(num_nodes)}
+
+        # Add edges
+        edge_index = torch.cat(edge_index, dim=1)
+        edge_index = torch.unique(edge_index.T, dim=0).T
+        G.add_edges_from(edge_index.T.tolist())
+
+        # Plot the graph
+        pos = nx.kamada_kawai_layout(G)
+        cmap = matplotlib.colormaps.get_cmap('viridis')
+        pax = nx.draw_networkx_nodes(G, pos, ax=axs[0], node_color='lightblue', node_size=200)
+        norm = plt.Normalize(min(weights), max(weights))
+        colors = [cmap(norm(w)) for w in weights]
+        nx.draw_networkx_edges(G, pos, ax=axs[0], edge_color=colors, width=4)
+        n_labels = {i: str(i) for i in range(num_nodes)}
+        nx.draw_networkx_labels(G, pos, n_labels, ax=axs[0], font_size=10,font_color='r')
+        axs[0].set_title('Graph with weights')
+
+        # Plot the ground truth
+        G_gt = nx.DiGraph()
+        G_gt.add_nodes_from(range(num_nodes))
+        G_gt.add_edges_from(edge_index.T.tolist())
+        nx.draw_networkx_nodes(G_gt, pos, ax=axs[1], node_color='lightblue', node_size=200)
+        colors = ['r' if edge else 'lightblue' for edge in edge_gt.tolist()]
+        nx.draw_networkx_edges(G_gt, pos, ax=axs[1], edge_color=colors, width=4)
+        axs[1].set_title('Ground Truth Graph')
+
+        plt.colorbar(pax, ax=axs[0])
+
+        return fig, {'auc_score': auc_score}
+    
+    return None, {'auc_score': auc_score}
 

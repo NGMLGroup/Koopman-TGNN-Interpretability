@@ -460,7 +460,7 @@ def ground_truth(dataset_name, testing=False):
         edge_indexes = edge_indexes[:50]
         node_labels = node_labels[:50]
 
-    nodes_gt, node_sums_gt, times_gt = [], [], []
+    nodes_gt, node_sums_gt, times_gt, edges_gt = [], [], [], []
 
     # Create ground truth explanations
     for node_label, edge_index in tqdm(zip(node_labels, edge_indexes)):
@@ -492,8 +492,18 @@ def ground_truth(dataset_name, testing=False):
         nodes_gt.append(node_gt)
         node_sums_gt.append(node_gt.squeeze().sum(axis=1).type(torch.int))
         times_gt.append(time_gt)
+
+        # edge ground truth
+        edge_index = torch.cat(edge_index, dim=1)
+        edge_index = torch.unique(edge_index.T, dim=0).T
+        edge_gt = torch.zeros(edge_index.size(1), dtype=torch.int)
+        for i in range(edge_index.size(1)):
+            src, tgt = edge_index[0, i], edge_index[1, i]
+            if src in torch.where(node_gt[-1])[0] and tgt in torch.where(node_gt[-1])[0]:
+                edge_gt[i] = 1
+        edges_gt.append(edge_gt)
     
-    return nodes_gt, node_sums_gt, times_gt
+    return nodes_gt, node_sums_gt, times_gt, edges_gt
 
 
 
