@@ -9,7 +9,7 @@ from torch_sparse import SparseTensor
 
 class SINDy:
     """Sparse Identification of Nonlinear Dynamics"""
-    def __init__(self, Z, edge_indexes, k, alpha=1.0, emb="PCA"):
+    def __init__(self, Z, edge_index, k, alpha=1.0, emb="PCA"):
         # Z in (nodes, time, features)
 
         self.k = k
@@ -27,15 +27,15 @@ class SINDy:
 
         # Compute principal components
         if self.emb == None:
-            self.Zp = Z
+            self.Zp = rearrange(Z, 't n f -> n t f')
         else:
-            self.Zp = rearrange(Z, 'n t f -> (n t) f')
+            self.Zp = rearrange(Z, 't n f -> (t n) f')
             self.Zp = self.emb_engine.fit_transform(self.Zp)
-            self.Zp = rearrange(self.Zp, '(n t) k -> n t k', n=Z.shape[0], t=Z.shape[1], k=k)
+            self.Zp = rearrange(self.Zp, '(t n) k -> n t k', t=Z.shape[0], n=Z.shape[1], k=k)
 
         # Concatenate edge indexes
         # and compute adjacency matrix
-        adj_matrix = self.from_edge_index_to_adj(edge_indexes)
+        adj_matrix = self.from_edge_index_to_adj(edge_index)
 
         # Compute SINDy library
         self.Zp = torch.from_numpy(self.Zp)
@@ -56,8 +56,8 @@ class SINDy:
         return self.Xi
     
 
-    def from_edge_index_to_adj(self, edge_indexes):
-        edge_index = torch.cat(edge_indexes, dim=1)
+    def from_edge_index_to_adj(self, edge_index):
+        edge_index = torch.cat(edge_index, dim=1)
         edge_index = torch.unique(edge_index.T, dim=0).T
 
         num_nodes = edge_index.max().item() + 1
