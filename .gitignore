@@ -20,6 +20,7 @@ plots/graphs
 plots/time_gt
 *csv
 *xlsx
+*png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
