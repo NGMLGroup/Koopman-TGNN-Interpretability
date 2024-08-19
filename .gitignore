@@ -16,8 +16,7 @@ wandb
 *.gexf
 *.gephi
 *.h5
-plots/graphs
-plots/time_gt
+plots/
 *csv
 *xlsx
 *png

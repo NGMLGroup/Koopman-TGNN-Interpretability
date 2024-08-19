@@ -22,7 +22,7 @@ def make_gif(dataset_name, graph_idx):
     all_edges = np.unique(all_edges, axis=0) - node_offset
 
     # Specify the folder path to save the images
-    folder_path = "./plots/graphs"
+    folder_path = f"./plots/{dataset_name}/graphs"
 
     # Create the folder if it doesn't exist
     if not os.path.exists(folder_path):
