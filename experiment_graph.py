@@ -24,7 +24,7 @@ else:
     device = torch.device('cpu')
 
 config = {
-        'dataset': 'facebook_ct1', # 'infectious_ct1', #
+        'dataset': 'infectious_ct1', #'facebook_ct1', # 
         'hidden_size': 64,
         'rnn_layers': 5,
         'readout_layers': 1,
@@ -93,7 +93,7 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
                                 threshold=config['threshold'],
                                 plot=config['plot'])
     if fig is not None:
-        fig.savefig(f'plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png')
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png")
     
     fig, win_prec, win_rec, win_f1, win_base = \
         windowing_analysis(val_modes[g,:,mode_idx], val_times_gt[g],
@@ -101,18 +101,18 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
                             threshold=config['threshold'],
                             plot=config['plot'])
     if fig is not None:
-        fig.savefig(f'plots/{config['dataset']}/time_gt/{g}_win_{mode_idx}.png')
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_win_{mode_idx}.png")
     
     fig, cc_lag_err, corr = cross_correlation(val_modes[g,:,mode_idx], val_times_gt[g],
                                                 plot=config['plot'])
     if fig is not None:
-        fig.savefig(f'plots/{config['dataset']}/time_gt/{g}_cc_{mode_idx}.png')
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_cc_{mode_idx}.png")
     
     fig, mw_p_value = mann_whitney_test(val_modes[g,:,mode_idx], val_times_gt[g], 
                                         window_size=config['window_size'],
                                         plot=config['plot'])
     if fig is not None:
-        fig.savefig(f'plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png')
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
     
     plt.close('all')
     
@@ -135,7 +135,7 @@ fig, mw_p_value_dt = mann_whitney_test_dataset(val_modes[val_y==1,:,mode_idx],
                                                 plot=config['plot'])
 
 if fig is not None:
-    fig.savefig(f'plots/{config['dataset']}/time_gt/dataset_mw_{mode_idx}.png')
+    fig.savefig(f"plots/{config['dataset']}/time_gt/dataset_mw_{mode_idx}.png")
 
 # Create a dataframe with the results
 results = pd.DataFrame({
@@ -148,13 +148,14 @@ results = pd.DataFrame({
     'window_f1_score': r_win_f1,
     'window_baseline_f1': r_win_base,
     'max_corr_lag_error': r_cross,
+    'correlation': r_corr,
     'mw_p_value': r_mann,
     'mw_p_value_dt': mw_p_value_dt
 })
 
 # Save the dataframe to an Excel file in a new sheet
 writer = pd.ExcelWriter(path='results.xlsx', engine='xlsxwriter')
-results.to_excel(writer, sheet_name='time_gt', index=False)
+results.to_excel(writer, sheet_name=f"time_gt_{config['dataset']}", index=False)
 
 
 # Spatial ground truth analysis
@@ -171,7 +172,7 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     aucs.append(auc)
 
     if fig is not None:
-        fig.savefig(f'plots/{config['dataset']}/edge_gt/{g}_mask.png')
+        fig.savefig(f"plots/{config['dataset']}/edge_gt/{g}_mask.png")
     
     plt.close('all')
 
@@ -181,5 +182,5 @@ results = pd.DataFrame({
 })
 
 # Save the dataframe to an Excel file in a new sheet
-results.to_excel(writer, sheet_name='edge_gt', index=False)
+results.to_excel(writer, sheet_name=f"edge_gt_{config['dataset']}", index=False)
 writer.close()
