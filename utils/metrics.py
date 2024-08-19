@@ -23,7 +23,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         plot (bool): Whether to plot the signal and derivative.
 
     Returns:
-        dict: precision, recall, F1-score, baseline.
+        precision, recall, F1-score, baseline.
         figure: The plot of the signal and derivative.
     """
 
@@ -58,13 +58,6 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     # Baseline F1 score
     baseline_f1 = F1_baseline(ground_truth_i)
 
-    result = {
-        'thr_precision': precision,
-        'thr_recall': recall,
-        'thr_f1_score': f1_score,
-        'thr_baseline_f1': baseline_f1
-    }
-
     if plot:
 
         # Plot the signal
@@ -87,13 +80,13 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         axs[1].legend()
 
         # Print the results
-        axs[1].text(0, -0.3, f"Precision: {result['thr_precision']:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.4, -0.3, f"Recall: {result['thr_recall']:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.8, -0.3, f"F1-score: {result['thr_f1_score']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0, -0.3, f"Precision: {precision:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.4, -0.3, f"Recall: {recall:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.8, -0.3, f"F1-score: {f1_score:.2f}", transform=axs[1].transAxes)
 
-        return fig, result
+        return fig, precision, recall, f1_score, baseline_f1
 
-    return None, result
+    return None, precision, recall, f1_score, baseline_f1
     
 
 def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot=False):
@@ -113,7 +106,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         plot (bool): Whether to plot the signal and derivative.
 
     Returns:
-        dict: precision, recall, F1-score, baseline.
+        precision, recall, F1-score, baseline.
         figure: The plot of the signal and derivative.
     """
 
@@ -149,13 +142,6 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     # Baseline F1 score
     baseline_f1 = F1_baseline(ground_truth_i)
 
-    result = {
-        'window_precision': precision,
-        'window_recall': recall,
-        'window_f1_score': f1_score,
-        'window_baseline_f1': baseline_f1
-    }
-
     if plot:
 
         # Plot the signal
@@ -177,13 +163,13 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         axs[1].legend()
 
         # Print the results
-        axs[1].text(0, -0.3, f"Precision: {result['window_precision']:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.4, -0.3, f"Recall: {result['window_recall']:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.8, -0.3, f"F1-score: {result['window_f1_score']:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0, -0.3, f"Precision: {precision:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.4, -0.3, f"Recall: {recall:.2f}", transform=axs[1].transAxes)
+        axs[1].text(0.8, -0.3, f"F1-score: {f1_score:.2f}", transform=axs[1].transAxes)
 
-        return fig, result
+        return fig, precision, recall, f1_score, baseline_f1
 
-    return None, result
+    return None, precision, recall, f1_score, baseline_f1
 
 
 def F1_baseline(ground_truth):
@@ -227,8 +213,9 @@ def cross_correlation(signal, ground_truth, plot=False):
         plot (bool, optional): Whether to plot the cross-correlation. Defaults to False.
 
     Returns:
-        dict: The absolute value of the lag with the highest cross-correlation, 
-                i.e. how far the actual peak is from the desired lag of 0.
+        max_corr_lag_error: The absolute value of the lag with the highest cross-correlation, 
+            i.e. how far the actual peak is from the desired lag of 0.
+        corr_at_lag_0: The correlation at lag 0.
         figure: The plot of the signal and cross-correlation.
     """
 
@@ -245,6 +232,9 @@ def cross_correlation(signal, ground_truth, plot=False):
     # Identify the lag with the highest cross-correlation value
     max_corr_lag = lags[np.argmax(cross_correlation)]
     max_corr_lag_error = np.abs(max_corr_lag)
+    
+    # Compute correlation at lag 0
+    corr_at_lag_0 = np.corrcoef(derivative, ground_truth)[0, 1]
 
     if plot:
 
@@ -262,11 +252,11 @@ def cross_correlation(signal, ground_truth, plot=False):
         axs[1].set_xlabel('Lag')
         axs[1].legend()
 
-        axs[1].text(0, -0.3, f"Max Corr Lag Error: {max_corr_lag_error}", transform=axs[1].transAxes)
+        axs[1].text(0, -0.3, f"Correlation at lag 0: {corr_at_lag_0}", transform=axs[1].transAxes)
 
-        return fig, {'max_corr_lag_error': max_corr_lag_error}
+        return fig, max_corr_lag_error, corr_at_lag_0
 
-    return None, {'max_corr_lag_error': max_corr_lag_error}
+    return None, max_corr_lag_error, corr_at_lag_0
 
 
 def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
@@ -281,7 +271,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
         plot (bool, optional): Whether to plot the Mann-Whitney U test. Defaults to False.
 
     Returns:
-        dict: The p-value of the Mann-Whitney U test.
+        MW_U_test_p_value: The p-value of the Mann-Whitney U test.
         figure: The histogram of derivative values around ground-truth and random instants.
     """
 
@@ -328,10 +318,10 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
 
         axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
 
-        return fig, {'mw_p_value': MW_U_test_p_value}
+        return fig, MW_U_test_p_value
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
-    return None, {'mw_p_value': MW_U_test_p_value}
+    return None, MW_U_test_p_value
 
 
 def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
@@ -346,7 +336,7 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
         plot (bool, optional): Whether to plot the Mann-Whitney U test. Defaults to False.
 
     Returns:
-        dict: The p-value of the Mann-Whitney U test.
+        MW_U_test_p_value: The p-value of the Mann-Whitney U test.
         figure: The histogram of derivative values around ground-truth and random instants.
     """
 
@@ -398,10 +388,10 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
 
         axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
 
-        return fig, {'mw_p_value_dt': MW_U_test_p_value}
+        return fig, MW_U_test_p_value
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
-    return None, {'mw_p_value_dt': MW_U_test_p_value}
+    return None, MW_U_test_p_value
 
 
 def ml_probes(signal, ground_truth, seed=42, verbose=False):
@@ -514,7 +504,7 @@ def auc_analysis(K, edge_index, edge_gt, plot=False):
         plot (bool): Whether to plot the graph and ground truth.
     
     Returns:
-        dict: The ROC AUC score.
+        auc_score: The ROC AUC score.
         figure: The graph and ground truth plots.
     """
 
@@ -565,7 +555,7 @@ def auc_analysis(K, edge_index, edge_gt, plot=False):
 
         plt.colorbar(pax, ax=axs[0])
 
-        return fig, {'auc_score': auc_score}
+        return fig, auc_score
     
-    return None, {'auc_score': auc_score}
+    return None, auc_score
 
