@@ -23,19 +23,19 @@ np.random.seed(seed)
 
 # Set up config
 config = {
-        'dataset': 'facebook_ct1', # 'infectious_ct1', #
-        'hidden_size': 64,
-        'rnn_layers': 5,
-        'readout_layers': 1,
+        'dataset': 'infectious_ct1', #'facebook_ct1', # 
+        'hidden_size': 16, #64
+        'rnn_layers': 9, #5
+        'readout_layers': 3, #1
         'cell_type': 'lstm',
-        'dim_red': 64,
+        'dim_red': 16, #64
         'self_loop': False,
         'verbose': True,
         'cat_states_layers': True,
         'weight_decay': 0,
-        'step_size': 30,
-        'gamma': 0.5,
-        'beta': 0.5
+        'step_size': 20, #30
+        'gamma': 0.9, #0.5
+        'beta': 0.05 #0.5
         }
 
 wandb.init(project="koopman", config=config)
