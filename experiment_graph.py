@@ -25,11 +25,11 @@ else:
 
 config = {
         'dataset': 'infectious_ct1', #'facebook_ct1', # 
-        'hidden_size': 64,
-        'rnn_layers': 5,
-        'readout_layers': 1,
+        'hidden_size': 16, #64,
+        'rnn_layers': 9, #5,
+        'readout_layers': 3, #1,
         'cell_type': 'lstm',
-        'dim_red': 10,
+        'dim_red': 16, #10,
         'add_self_loops': False, # Too memory-demanding
         'verbose': False,
         'cat_states_layers': True,
