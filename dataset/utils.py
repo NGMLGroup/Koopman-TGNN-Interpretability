@@ -224,11 +224,16 @@ def load_classification_dataset(name, b_add_self_loops=True):
 
     lines = [list(map(int, line.strip().split(','))) for line in lines]
 
-    if name == 'facebook_ct1':
-        timesteps = 106
-    elif name == 'infectious_ct1':
-        timesteps = 50
-    else:
+    timesteps_dict = {'facebook_ct1': 106, 
+                      'infectious_ct1': 50,
+                      'dblp_ct1': 48,
+                      'highschool_ct1': 205,
+                      'mit_ct1': 5566,
+                      'tumblr_ct1': 91}
+    
+    timesteps = timesteps_dict.get(name)
+    
+    if timesteps is None:
         raise ValueError(f"Dataset {name} not supported.")
 
     node_label = torch.zeros((timesteps, num_nodes, 1))
