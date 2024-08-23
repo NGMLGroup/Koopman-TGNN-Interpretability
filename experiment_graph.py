@@ -5,6 +5,8 @@ from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
+import json
+import argparse
 
 from sklearn.model_selection import train_test_split
 from dataset.utils import (load_classification_dataset,
@@ -23,23 +25,28 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
-config = {
-        'dataset': 'infectious_ct1', #'facebook_ct1', # 
-        'hidden_size': 16, #64,
-        'rnn_layers': 9, #5,
-        'readout_layers': 3, #1,
-        'cell_type': 'lstm',
-        'dim_red': 16, #10,
-        'add_self_loops': False, # Too memory-demanding
-        'verbose': False,
-        'cat_states_layers': True,
-        'K_type': 'data', # 'model',
-        'testing': False,
-        'seed': 42,
-        'threshold': None,
-        'window_size': 5,
-        'plot': True
-        }
+# Load configuration from JSON file
+config_file = 'configs/GCRN_config.json'
+try:
+    with open(config_file, 'r') as f:
+        configs = json.load(f)
+except FileNotFoundError:
+    print(f"Error: The configuration file {config_file} was not found.")
+    sys.exit(1)
+except json.JSONDecodeError as e:
+    print(f"Error: Failed to decode JSON from the configuration file {config_file}.")
+    print(f"Details: {e}")
+    sys.exit(1)
+
+# Select the dataset
+parser = argparse.ArgumentParser(description='Experiment graph')
+parser.add_argument('--dataset', type=str, default='infectious_ct1', help='Name of the dataset')
+
+args = parser.parse_args()
+dataset_name = args.dataset
+
+# Retrieve the configuration for the selected dataset
+config = configs[dataset_name]
 
 seed = config['seed']
 random.seed(seed)
@@ -58,6 +65,7 @@ train_node_sums_gt, val_node_sums_gt, train_times_gt, val_times_gt = train_test_
     torch.stack(times_gt).numpy(), 
     test_size=0.2, 
     random_state=seed)
+
 
 # Time ground truth analysis
 
