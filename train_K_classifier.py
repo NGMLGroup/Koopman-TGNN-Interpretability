@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from einops import rearrange
 
 from dataset.utils import process_FB
-from DMD.dmd import KANN
+from koopman.dmd import KANN
 
 seed = 42
 random.seed(seed)

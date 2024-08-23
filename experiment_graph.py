@@ -1,6 +1,7 @@
 import torch
 import random
 import sys
+import os
 from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -100,6 +101,17 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
         threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g], 
                                 threshold=config['threshold'],
                                 plot=config['plot'])
+
+    if fig is not None:
+        if not os.path.exists("plots"):
+            os.makedirs("plots")
+        if not os.path.exists(f"plots/{config['dataset']}"):
+            os.makedirs(f"plots/{config['dataset']}")
+        if not os.path.exists(f"plots/{config['dataset']}/time_gt"):
+            os.makedirs(f"plots/{config['dataset']}/time_gt")
+        if not os.path.exists(f"plots/{config['dataset']}/edge_gt"):
+            os.makedirs(f"plots/{config['dataset']}/edge_gt")
+
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png")
     
