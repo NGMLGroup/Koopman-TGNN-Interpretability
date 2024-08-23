@@ -23,20 +23,38 @@ random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
 
-# Load configuration from JSON file
-config_file = 'configs/GCRN_config.json'
-with open(config_file, 'r') as f:
-    configs = json.load(f)
-
 # Select the dataset
 parser = argparse.ArgumentParser(description='Experiment graph')
 parser.add_argument('--dataset', type=str, default='infectious_ct1', help='Name of the dataset')
+parser.add_argument('--hidden_size', type=int, default=16, help='Feature dimension')
+parser.add_argument('--rnn_layers', type=int, default=1, help='Number of RNN layers')
+parser.add_argument('--readout_layers', type=int, default=1, help='Number of readout layers')
+parser.add_argument('--dim_red', type=int, default=16, help='Dimensionality reduction')
+parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay')
+parser.add_argument('--step_size', type=int, default=20, help='Early-stop step size')
+parser.add_argument('--gamma', type=float, default=0.5, help='Early-stop gamma')
+parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
+parser.add_argument('--verbose', type=bool, default=True, help='Verbose')
+parser.add_argument('--self_loop', type=bool, default=False, help='Self loop')
+parser.add_argument('--cell_type', type=str, default='lstm', help='Cell type')
+parser.add_argument('--cat_states_layers', type=bool, default=True, help='Concatenation of states')
+parser.add_argument('--beta', type=float, default=0.1, help='Weight of the ridge loss')
 
 args = parser.parse_args()
 dataset_name = args.dataset
 
-# Retrieve the configuration for the selected dataset
-config = configs[dataset_name]
+if not args.sweep:
+    # Load configuration from JSON file
+    config_file = 'configs/GCRN_config.json'
+    with open(config_file, 'r') as f:
+        configs = json.load(f)
+    # Retrieve the configuration for the selected dataset
+    if dataset_name not in configs:
+        raise ValueError(f"Hyperparameters for dataset {dataset_name} are missing.")
+    config = configs[dataset_name]
+    
+else:
+    config = vars(args)
 
 wandb.init(project="koopman", config=config)
 config = wandb.config

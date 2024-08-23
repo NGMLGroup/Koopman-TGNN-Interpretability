@@ -8,7 +8,7 @@ metric:
     
 parameters:
     dataset:
-        values: ["infectious_ct1"]
+        values: ["mit_ct1"]
     hidden_size:
         values: [16, 32, 64]
     rnn_layers:
@@ -23,3 +23,5 @@ parameters:
         values: [20, 30, 40, 50]
     gamma:
         values: [0.5, 0.7, 0.9]
+    sweep:
+        values: [True]
