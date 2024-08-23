@@ -3,6 +3,8 @@ import os
 import torch
 import tsl
 import random
+import json
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,22 +23,20 @@ random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
 
-# Set up config
-config = {
-        'dataset': 'infectious_ct1', #'facebook_ct1', # 
-        'hidden_size': 16, #64
-        'rnn_layers': 9, #5
-        'readout_layers': 3, #1
-        'cell_type': 'lstm',
-        'dim_red': 16, #64
-        'self_loop': False,
-        'verbose': True,
-        'cat_states_layers': True,
-        'weight_decay': 0,
-        'step_size': 20, #30
-        'gamma': 0.9, #0.5
-        'beta': 0.05 #0.5
-        }
+# Load configuration from JSON file
+config_file = 'configs/GCRN_config.json'
+with open(config_file, 'r') as f:
+    configs = json.load(f)
+
+# Select the dataset
+parser = argparse.ArgumentParser(description='Experiment graph')
+parser.add_argument('--dataset', type=str, default='infectious_ct1', help='Name of the dataset')
+
+args = parser.parse_args()
+dataset_name = args.dataset
+
+# Retrieve the configuration for the selected dataset
+config = configs[dataset_name]
 
 wandb.init(project="koopman", config=config)
 config = wandb.config
