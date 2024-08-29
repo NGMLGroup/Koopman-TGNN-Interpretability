@@ -1,6 +1,7 @@
 {
     "infectious_ct1": {
         "dataset": "infectious_ct1",
+        "emb_method": "PCA",
         "hidden_size": 16,
         "rnn_layers": 9,
         "readout_layers": 3,
@@ -19,10 +20,12 @@
         "weight_decay": 0,
         "step_size": 20,
         "gamma": 0.9,
-        "beta": 0.05
+        "beta": 0.05,
+        "add_self_dependency_sindy": true
     },
     "facebook_ct1": {
         "dataset": "facebook_ct1",
+        "emb_method": "PCA",
         "hidden_size": 64,
         "rnn_layers": 5,
         "readout_layers": 1,
@@ -41,10 +44,12 @@
         "weight_decay": 0,
         "step_size": 30,
         "gamma": 0.5,
-        "beta": 0.5
+        "beta": 0.5,
+        "add_self_dependency_sindy": true
     },
     "dblp_ct1": {
         "dataset": "dblp_ct1",
+        "emb_method": "PCA",
         "hidden_size": 16,
         "rnn_layers": 5,
         "readout_layers": 1,
@@ -63,6 +68,7 @@
         "weight_decay": 0.001,
         "step_size": 20,
         "gamma": 0.7,
-        "beta": 0.05
+        "beta": 0.05,
+        "add_self_dependency_sindy": true
     }
 }

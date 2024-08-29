@@ -9,7 +9,7 @@ def get_K(config, states):
         K = get_K_from_model(config)
         emb_engine = None
     elif config['K_type'] == 'data':
-        emb_engine, K = get_K_from_data(states, config['dim_red'])
+        emb_engine, K = get_K_from_data(states, config['dim_red'], config['emb_method'])
     else:
         raise ValueError(f'Unknown Koopman operator type: {config["K_type"]}')
     return emb_engine, K
@@ -34,11 +34,10 @@ def get_K_from_model(config):
     return K
 
 
-def get_K_from_data(states, dim_red):
+def get_K_from_data(states, dim_red, method='PCA'):
     from koopman.dmd import DMD
 
     # compute local Koopman operator
-    method = 'PCA'
     dmd = DMD(states, k=dim_red, emb=method)
 
     K = dmd.compute_KOP()
@@ -59,19 +58,30 @@ def change_basis(states, v, emb_engine):
     return states
 
 
-def get_K_from_SINDy(edge_index, node_state, dim_red):
+def get_K_from_SINDy(edge_index, node_state, dim_red, add_self_dependency=False, degree=2, method='PCA'):
     from koopman.sindy import SINDy
 
     # Compute Koopman operator with SINDy
-    method = 'PCA'
-    sindy = SINDy(node_state, edge_index, k=dim_red, emb=method)
+    sindy = SINDy(node_state, edge_index, k=dim_red,
+                  add_self_dependency=add_self_dependency,
+                  degree=degree, emb=method)
 
     K = sindy.fit()
 
     # Remove "F" dimension
-    num_blocks = K.shape[0] // dim_red
-    sum_K = np.array([np.sum(K[i*dim_red:(i+1)*dim_red], axis=0) for i in range(num_blocks)])
-    num_blocks = K.shape[1] // dim_red
-    sum_K = np.stack([np.sum(sum_K[:,i*dim_red:(i+1)*dim_red], axis=1) for i in range(num_blocks)], axis=1)
+    sum_K = K.reshape(-1, dim_red, K.shape[1]).sum(axis=1)
+    sum_K = sum_K.reshape(K.shape[0], -1, dim_red).sum(axis=2)
 
     return sum_K
+
+
+def get_weights_from_SINDy(edge_index, node_state, dim_red, add_self_dependency=False, degree=2, method='PCA'):
+    from koopman.sindy import SINDy
+
+    # Compute Koopman operator with SINDy
+    # and return edge weights
+    sindy = SINDy(node_state, edge_index, k=dim_red, 
+                  add_self_dependency=add_self_dependency, 
+                  degree=degree, emb=method)
+    
+    return sindy.compute_weights()

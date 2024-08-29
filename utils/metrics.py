@@ -491,16 +491,17 @@ def logistic_regression(X_train, X_test, y_train, y_test, verbose, seed):
     return {'log_regr_roc_auc': log_regr_roc_auc}
 
 
-def auc_analysis(K, edge_index, edge_gt, plot=False):
+def auc_analysis(weights, edge_index, edge_gt, num_nodes, plot=False):
     """
     Computes the Koopman operator via SINDy and uses it
     to compute the weights of the graph edges.
     Then, it computes the ROC AUC score between the edge weights.
 
     Args:
-        K (np.ndarray): The Koopman operator.
+        weights (torch.Tensor): Edge weights.
         edge_index (torch.Tensor): The edge index.
         edge_gt (np.ndarray): The ground-truth edge index.
+        num_nodes (int): The number of nodes in the graph.
         plot (bool): Whether to plot the graph and ground truth.
     
     Returns:
@@ -511,10 +512,6 @@ def auc_analysis(K, edge_index, edge_gt, plot=False):
     from sklearn.metrics import roc_auc_score
     import networkx as nx
     import torch
-
-    # Compute the weights
-    num_nodes = K.shape[0]
-    weights = np.abs(K[:,2*num_nodes:]).sum(axis=0)
     
     # Compute the AUC score
     auc_score = roc_auc_score(edge_gt, weights)

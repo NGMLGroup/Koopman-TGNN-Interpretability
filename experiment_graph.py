@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from dataset.utils import (load_classification_dataset,
                             process_classification_dataset,
                             ground_truth)
-from utils.utils import get_K, change_basis, get_K_from_SINDy
+from utils.utils import get_K, change_basis, get_weights_from_SINDy
 from utils.metrics import *
 
 
@@ -33,10 +33,6 @@ try:
         configs = json.load(f)
 except FileNotFoundError:
     print(f"Error: The configuration file {config_file} was not found.")
-    sys.exit(1)
-except json.JSONDecodeError as e:
-    print(f"Error: Failed to decode JSON from the configuration file {config_file}.")
-    print(f"Details: {e}")
     sys.exit(1)
 
 # Select the dataset
@@ -109,8 +105,10 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
             os.makedirs(f"plots/{config['dataset']}")
         if not os.path.exists(f"plots/{config['dataset']}/time_gt"):
             os.makedirs(f"plots/{config['dataset']}/time_gt")
-        if not os.path.exists(f"plots/{config['dataset']}/edge_gt"):
-            os.makedirs(f"plots/{config['dataset']}/edge_gt")
+        if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg2"):
+            os.makedirs(f"plots/{config['dataset']}/edge_gt/deg2")
+        if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg3"):
+            os.makedirs(f"plots/{config['dataset']}/edge_gt/deg3")
 
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png")
@@ -179,26 +177,45 @@ results.to_excel(writer, sheet_name=f"time_gt_{config['dataset']}", index=False)
 
 
 # Spatial ground truth analysis
-aucs = []
+aucs2, aucs3 = [], []
 edge_indexes, _, _ = load_classification_dataset(config['dataset'], False)
 for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
 
     if states.targets[g]==0 or torch.sum(edges_gt[g]) == 0:
         continue
 
-    K = get_K_from_SINDy(edge_indexes[g], node_states[g], config['dim_red'])
+    weights = get_weights_from_SINDy(edge_indexes[g], node_states[g], config['dim_red'],
+                                     add_self_dependency=config['add_self_dependency_sindy'],
+                                     degree=2,
+                                     method=config['emb_method'])
 
-    fig, auc = auc_analysis(K, edge_indexes[g], edges_gt[g], plot=config['plot'])
-    aucs.append(auc)
+    num_nodes = node_states[g].shape[0]
+    fig, auc = auc_analysis(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
+    aucs2.append(auc)
 
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/edge_gt/{g}_mask.png")
+        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg2/{g}_mask.png")
+    
+    plt.close('all')
+
+    weights = get_weights_from_SINDy(edge_indexes[g], node_states[g], config['dim_red'],
+                                     add_self_dependency=config['add_self_dependency_sindy'],
+                                     degree=3,
+                                     method=config['emb_method'])
+
+    num_nodes = node_states[g].shape[0]
+    fig, auc = auc_analysis(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
+    aucs3.append(auc)
+
+    if fig is not None:
+        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg3/{g}_mask.png")
     
     plt.close('all')
 
 
 results = pd.DataFrame({
-    'auc': aucs,
+    'auc_2': aucs2,
+    'auc_3': aucs3
 })
 
 # Save the dataframe to an Excel file in a new sheet
