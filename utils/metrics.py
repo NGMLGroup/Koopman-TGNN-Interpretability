@@ -491,15 +491,14 @@ def logistic_regression(X_train, X_test, y_train, y_test, verbose, seed):
     return {'log_regr_roc_auc': log_regr_roc_auc}
 
 
-def auc_analysis(weights, edge_index, edge_gt, num_nodes, plot=False):
+def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
     """
-    Computes the Koopman operator via SINDy and uses it
-    to compute the weights of the graph edges.
-    Then, it computes the ROC AUC score between the edge weights.
+    Takes the edge weights computed via SINDy and 
+    computes the ROC AUC score between the edge weights and GT.
 
     Args:
         weights (torch.Tensor): Edge weights.
-        edge_index (torch.Tensor): The edge index.
+        edge_index (torch.Tensor): Graph topology.
         edge_gt (np.ndarray): The ground-truth edge index.
         num_nodes (int): The number of nodes in the graph.
         plot (bool): Whether to plot the graph and ground truth.
@@ -556,3 +555,67 @@ def auc_analysis(weights, edge_index, edge_gt, num_nodes, plot=False):
     
     return None, auc_score
 
+
+def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
+    """
+    Takes the node weights computed with DMD analysis and 
+    computes the ROC AUC score between the node weights and GT.
+
+    Args:
+        weights (torch.Tensor): Node weights.
+        node_gt (np.ndarray): The ground-truth for nodes.
+        edge_index (torch.Tensor): Graph topology.
+        plot (bool): Whether to plot the graph and ground truth.
+    
+    Returns:
+        auc_score: The ROC AUC score.
+        figure: The graph and ground truth plots.
+    """
+
+    from sklearn.metrics import roc_auc_score
+    import networkx as nx
+    import torch
+
+    # Compute the AUC score
+    auc_score = roc_auc_score(node_gt, weights)
+
+    if plot:
+        fig, axs = plt.subplots(1, 2, figsize=(16, 7))
+        fig.suptitle(f'Graph AUC Analysis: {auc_score:.2f}')
+        G = nx.DiGraph()
+
+        # Add edges
+        edge_index = torch.cat(edge_index, dim=1)
+        edge_index = torch.unique(edge_index.T, dim=0).T
+        G.add_edges_from(edge_index.T.tolist())
+
+        # Add nodes
+        num_nodes = edge_index.max().item() + 1
+        G.add_nodes_from(range(num_nodes))
+        n_labels = {i: str(i) for i in range(num_nodes)}
+
+        # Plot the graph
+        pos = nx.kamada_kawai_layout(G)
+        cmap = matplotlib.colormaps.get_cmap('viridis')
+        norm = plt.Normalize(min(weights), max(weights))
+        colors = [cmap(norm(w)) for w in weights]
+        pax = nx.draw_networkx_nodes(G, pos, ax=axs[0], node_color=colors, node_size=200)
+        nx.draw_networkx_edges(G, pos, ax=axs[0], edge_color='lightblue', width=4)
+        n_labels = {i: str(i) for i in range(num_nodes)}
+        nx.draw_networkx_labels(G, pos, n_labels, ax=axs[0], font_size=10,font_color='r')
+        axs[0].set_title('Graph with weights')
+
+        # Plot the ground truth % FIXME: Check if this is correct
+        G_gt = nx.DiGraph()
+        G_gt.add_nodes_from(range(num_nodes))
+        G_gt.add_edges_from(edge_index.T.tolist())
+        colors = ['r' if node else 'lightblue' for node in node_gt.tolist()]
+        nx.draw_networkx_nodes(G_gt, pos, ax=axs[1], node_color=colors, node_size=200)
+        nx.draw_networkx_edges(G_gt, pos, ax=axs[1], edge_color='lightblue', width=4)
+        axs[1].set_title('Ground Truth Graph')
+
+        plt.colorbar(pax, ax=axs[0])
+
+        return fig, auc_score
+    
+    return None, auc_score

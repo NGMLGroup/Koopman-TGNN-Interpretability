@@ -74,3 +74,19 @@ class DMD:
         states = self.emb_engine.inverse_transform(flat_proj_states)
         states = states.reshape(bsz, sqsz, -1)
         return states
+    
+    def compute_weights(self):
+
+        C = self.compute_KOP()
+
+        # Compute eigenvalues and eigenvectors
+        E, V = np.linalg.eig(C)
+        idx = np.argsort(np.abs(E))[::-1]
+        E = E[idx]
+        V = V[:, idx]
+
+        # Project states to first Koopman mode
+        m = V[:, 0].real
+        weights = np.dot(self.Zp, m)
+
+        return weights[:,-1]

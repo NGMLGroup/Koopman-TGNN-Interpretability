@@ -13,7 +13,9 @@ from sklearn.model_selection import train_test_split
 from dataset.utils import (load_classification_dataset,
                             process_classification_dataset,
                             ground_truth)
-from utils.utils import get_K, change_basis, get_weights_from_SINDy
+from utils.utils import (get_K, change_basis, 
+                         get_weights_from_SINDy,
+                         get_weights_from_DMD)
 from utils.metrics import *
 
 
@@ -37,7 +39,7 @@ except FileNotFoundError:
 
 # Select the dataset
 parser = argparse.ArgumentParser(description='Experiment graph')
-parser.add_argument('--dataset', type=str, default='infectious_ct1', help='Name of the dataset')
+parser.add_argument('--dataset', type=str, default='tumblr_ct1', help='Name of the dataset')
 
 args = parser.parse_args()
 dataset_name = args.dataset
@@ -50,18 +52,40 @@ random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
 
+# Create the directory to save the plots
+if config['plot']:
+    if not os.path.exists("plots"):
+        os.makedirs("plots")
+    if not os.path.exists(f"plots/{config['dataset']}"):
+        os.makedirs(f"plots/{config['dataset']}")
+    if not os.path.exists(f"plots/{config['dataset']}/time_gt"):
+        os.makedirs(f"plots/{config['dataset']}/time_gt")
+    if not os.path.exists(f"plots/{config['dataset']}/node_gt/sindy"):
+        os.makedirs(f"plots/{config['dataset']}/node_gt/sindy")
+    if not os.path.exists(f"plots/{config['dataset']}/node_gt/dmd"):
+        os.makedirs(f"plots/{config['dataset']}/node_gt/dmd")
+    if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg2"):
+        os.makedirs(f"plots/{config['dataset']}/edge_gt/deg2")
+    if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg3"):
+        os.makedirs(f"plots/{config['dataset']}/edge_gt/deg3")
+
 
 # Load the dataset
 dataset, states, node_states, node_labels = process_classification_dataset(config, "DynCRNN", device)
-train_X, val_X, train_y, val_y = train_test_split(states.inputs, states.targets, test_size=0.2, random_state=seed)
+train_X, val_X, train_y, val_y, train_nodes, val_nodes = train_test_split(states.inputs, states.targets, node_states,
+                                                  test_size=0.2, random_state=seed)
+edge_indexes, _, _ = load_classification_dataset(config['dataset'], False)
 
 # Compare with ground-truth labels
 nodes_gt, node_sums_gt, times_gt, edges_gt = ground_truth(config['dataset'], config['testing'])
-train_node_sums_gt, val_node_sums_gt, train_times_gt, val_times_gt = train_test_split(
-    torch.stack(node_sums_gt).numpy(), 
-    torch.stack(times_gt).numpy(), 
-    test_size=0.2, 
-    random_state=seed)
+train_nodes_gt, val_nodes_gt, train_times_gt, val_times_gt, train_edge_indexes, val_edge_indexes = \
+    train_test_split(
+        nodes_gt, 
+        torch.stack(times_gt).numpy(),
+        edge_indexes,
+        test_size=0.2, 
+        random_state=seed
+        )
 
 
 # Time ground truth analysis
@@ -87,6 +111,7 @@ r_thr_prec, r_thr_rec, r_thr_f1, r_thr_base = [], [], [], []
 r_win_prec, r_win_rec, r_win_f1, r_win_base = [], [], [], []
 r_cross, r_corr = [], []
 r_mann = []
+aucs_nodes = []
 
 for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
 
@@ -97,18 +122,6 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
         threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g], 
                                 threshold=config['threshold'],
                                 plot=config['plot'])
-
-    if fig is not None:
-        if not os.path.exists("plots"):
-            os.makedirs("plots")
-        if not os.path.exists(f"plots/{config['dataset']}"):
-            os.makedirs(f"plots/{config['dataset']}")
-        if not os.path.exists(f"plots/{config['dataset']}/time_gt"):
-            os.makedirs(f"plots/{config['dataset']}/time_gt")
-        if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg2"):
-            os.makedirs(f"plots/{config['dataset']}/edge_gt/deg2")
-        if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg3"):
-            os.makedirs(f"plots/{config['dataset']}/edge_gt/deg3")
 
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png")
@@ -131,6 +144,12 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
                                         plot=config['plot'])
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
+
+    node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v12, emb_engine)
+    fig, auc = auc_analysis_nodes(node_modes[:,-1,mode_idx], val_nodes_gt[g][-1], 
+                                  val_edge_indexes[g], plot=config['plot'])
+    if fig is not None:
+        fig.savefig(f"plots/{config['dataset']}/node_gt/global_dmd/{g}_mask_{mode_idx}.png")
     
     plt.close('all')
     
@@ -145,6 +164,7 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
     r_cross.append(cc_lag_err)
     r_corr.append(corr)
     r_mann.append(mw_p_value)
+    aucs_nodes.append(auc)
 
 # Mann-Whitney U test on whole dataset
 fig, mw_p_value_dt = mann_whitney_test_dataset(val_modes[val_y==1,:,mode_idx], 
@@ -168,7 +188,8 @@ results = pd.DataFrame({
     'max_corr_lag_error': r_cross,
     'correlation': r_corr,
     'mw_p_value': r_mann,
-    'mw_p_value_dt': mw_p_value_dt
+    'mw_p_value_dt': mw_p_value_dt,
+    'auc_nodes': aucs_nodes
 })
 
 # Save the dataframe to an Excel file in a new sheet
@@ -178,7 +199,7 @@ results.to_excel(writer, sheet_name=f"time_gt_{config['dataset']}", index=False)
 
 # Spatial ground truth analysis
 aucs2, aucs3 = [], []
-edge_indexes, _, _ = load_classification_dataset(config['dataset'], False)
+aucs_nodes = []
 for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
 
     if states.targets[g]==0 or torch.sum(edges_gt[g]) == 0:
@@ -189,8 +210,8 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
                                      degree=2,
                                      method=config['emb_method'])
 
-    num_nodes = node_states[g].shape[0]
-    fig, auc = auc_analysis(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
+    num_nodes = node_states[g].shape[1]
+    fig, auc = auc_analysis_edges(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
     aucs2.append(auc)
 
     if fig is not None:
@@ -203,8 +224,7 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
                                      degree=3,
                                      method=config['emb_method'])
 
-    num_nodes = node_states[g].shape[0]
-    fig, auc = auc_analysis(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
+    fig, auc = auc_analysis_edges(weights, edge_indexes[g], edges_gt[g], num_nodes, plot=config['plot'])
     aucs3.append(auc)
 
     if fig is not None:
@@ -212,10 +232,22 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     
     plt.close('all')
 
+    # Spatial explanation via DMD
+    weights = get_weights_from_DMD(node_states[g], config['dim_red'],
+                                   method=config['emb_method'])
+    fig, auc = auc_analysis_nodes(weights, nodes_gt[g][-1], edge_indexes[g], plot=config['plot'])
+    aucs_nodes.append(auc)
+
+    if fig is not None:
+        fig.savefig(f"plots/{config['dataset']}/node_gt/local_dmd/{g}_mask.png")
+    
+    plt.close('all')
+
 
 results = pd.DataFrame({
     'auc_2': aucs2,
-    'auc_3': aucs3
+    'auc_3': aucs3,
+    'auc_nodes': aucs_nodes
 })
 
 # Save the dataframe to an Excel file in a new sheet

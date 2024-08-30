@@ -85,3 +85,13 @@ def get_weights_from_SINDy(edge_index, node_state, dim_red, add_self_dependency=
                   degree=degree, emb=method)
     
     return sindy.compute_weights()
+
+
+def get_weights_from_DMD(node_state, dim_red, method='PCA'):
+    from koopman.dmd import DMD
+
+    # Compute Koopman operator with DMD
+    node_state = rearrange(node_state, 't n f -> n t f')
+    dmd = DMD(node_state, k=dim_red, emb=method)
+
+    return dmd.compute_weights()
