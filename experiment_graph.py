@@ -60,10 +60,10 @@ if config['plot']:
         os.makedirs(f"plots/{config['dataset']}")
     if not os.path.exists(f"plots/{config['dataset']}/time_gt"):
         os.makedirs(f"plots/{config['dataset']}/time_gt")
-    if not os.path.exists(f"plots/{config['dataset']}/node_gt/sindy"):
-        os.makedirs(f"plots/{config['dataset']}/node_gt/sindy")
-    if not os.path.exists(f"plots/{config['dataset']}/node_gt/dmd"):
-        os.makedirs(f"plots/{config['dataset']}/node_gt/dmd")
+    if not os.path.exists(f"plots/{config['dataset']}/node_gt/global_dmd"):
+        os.makedirs(f"plots/{config['dataset']}/node_gt/global_dmd")
+    if not os.path.exists(f"plots/{config['dataset']}/node_gt/local_dmd"):
+        os.makedirs(f"plots/{config['dataset']}/node_gt/local_dmd")
     if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg2"):
         os.makedirs(f"plots/{config['dataset']}/edge_gt/deg2")
     if not os.path.exists(f"plots/{config['dataset']}/edge_gt/deg3"):
