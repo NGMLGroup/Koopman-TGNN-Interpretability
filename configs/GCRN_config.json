@@ -21,7 +21,8 @@
         "step_size": 20,
         "gamma": 0.9,
         "beta": 0.05,
-        "add_self_dependency_sindy": true
+        "add_self_dependency_sindy": true,
+        "mode_idx": 0
     },
     "facebook_ct1": {
         "dataset": "facebook_ct1",
@@ -45,7 +46,8 @@
         "step_size": 30,
         "gamma": 0.5,
         "beta": 0.5,
-        "add_self_dependency_sindy": true
+        "add_self_dependency_sindy": true,
+        "mode_idx": 0
     },
     "dblp_ct1": {
         "dataset": "dblp_ct1",
@@ -69,7 +71,8 @@
         "step_size": 20,
         "gamma": 0.7,
         "beta": 0.05,
-        "add_self_dependency_sindy": true
+        "add_self_dependency_sindy": true,
+        "mode_idx": 0
     },
     "tumblr_ct1": {
         "dataset": "tumblr_ct1",
@@ -93,6 +96,7 @@
         "step_size": 40,
         "gamma": 0.9,
         "beta": 0.5,
-        "add_self_dependency_sindy": true
+        "add_self_dependency_sindy": true,
+        "mode_idx": 0
     }
 }

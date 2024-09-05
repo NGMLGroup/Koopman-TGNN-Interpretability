@@ -105,7 +105,7 @@ modes = change_basis(states.inputs, v12, emb_engine)
 val_modes = change_basis(val_X, v12, emb_engine)
 
 # Choose eigenvector
-mode_idx = 1
+mode_idx = config['mode_idx']
 
 r_thr_prec, r_thr_rec, r_thr_f1, r_thr_base = [], [], [], []
 r_win_prec, r_win_rec, r_win_f1, r_win_base = [], [], [], []
@@ -146,7 +146,8 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
 
     node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v12, emb_engine)
-    fig, auc = auc_analysis_nodes(node_modes[:,-1,mode_idx], val_nodes_gt[g][-1], 
+    weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,1].mean()
+    fig, auc = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
                                   val_edge_indexes[g], plot=config['plot'])
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/node_gt/global_dmd/{g}_mask_{mode_idx}.png")
@@ -233,9 +234,12 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     plt.close('all')
 
     # Spatial explanation via DMD
-    weights = get_weights_from_DMD(node_states[g], config['dim_red'],
+    weights = get_weights_from_DMD(node_states[g], 
+                                   config['dim_red'],
+                                   mode_idx=mode_idx,
                                    method=config['emb_method'])
-    fig, auc = auc_analysis_nodes(weights, nodes_gt[g][-1], edge_indexes[g], plot=config['plot'])
+    weights = weights - weights.mean()
+    fig, auc = auc_analysis_nodes(np.abs(weights), nodes_gt[g][-1], edge_indexes[g], plot=config['plot'])
     aucs_nodes.append(auc)
 
     if fig is not None:

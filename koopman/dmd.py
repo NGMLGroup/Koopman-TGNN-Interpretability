@@ -75,7 +75,7 @@ class DMD:
         states = states.reshape(bsz, sqsz, -1)
         return states
     
-    def compute_weights(self):
+    def compute_weights(self, mode_idx=0):
 
         C = self.compute_KOP()
 
@@ -86,7 +86,7 @@ class DMD:
         V = V[:, idx]
 
         # Project states to first Koopman mode
-        m = V[:, 0].real
+        m = V[:, mode_idx].real
         weights = np.dot(self.Zp, m)
 
         return weights[:,-1]
