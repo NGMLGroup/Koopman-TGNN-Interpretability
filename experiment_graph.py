@@ -146,7 +146,7 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
 
     node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v, emb_engine)
-    weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,1].mean()
+    weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,mode_idx].mean()
     fig, auc = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
                                   val_edge_indexes[g], plot=config['plot'])
     if fig is not None:
