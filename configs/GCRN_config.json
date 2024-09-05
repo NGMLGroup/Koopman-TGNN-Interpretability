@@ -22,11 +22,11 @@
         "gamma": 0.9,
         "beta": 0.05,
         "add_self_dependency_sindy": true,
-        "mode_idx": 0
+        "mode_idx": 1
     },
     "facebook_ct1": {
         "dataset": "facebook_ct1",
-        "emb_method": "PCA",
+        "emb_method": "TruncatedSVD",
         "hidden_size": 64,
         "rnn_layers": 5,
         "readout_layers": 1,
@@ -51,7 +51,7 @@
     },
     "dblp_ct1": {
         "dataset": "dblp_ct1",
-        "emb_method": "PCA",
+        "emb_method": "TruncatedSVD",
         "hidden_size": 16,
         "rnn_layers": 5,
         "readout_layers": 1,
@@ -72,11 +72,11 @@
         "gamma": 0.7,
         "beta": 0.05,
         "add_self_dependency_sindy": true,
-        "mode_idx": 0
+        "mode_idx": 1
     },
     "tumblr_ct1": {
         "dataset": "tumblr_ct1",
-        "emb_method": "PCA",
+        "emb_method": "TruncatedSVD",
         "hidden_size": 16,
         "rnn_layers": 8,
         "readout_layers": 1,
