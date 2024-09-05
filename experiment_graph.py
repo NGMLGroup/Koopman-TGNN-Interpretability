@@ -98,11 +98,11 @@ E, V = np.linalg.eig(K)
 idx = np.argsort(np.abs(E))[::-1] # sort eigenvalues and eigenvectors
 E = E[idx]
 V = V[:, idx]
-v12 = V[:,0:2].real # first two eigenvectors (real parts)
+v = V.real # first two eigenvectors (real parts)
 
 # Compute the Koopman modes
-modes = change_basis(states.inputs, v12, emb_engine)
-val_modes = change_basis(val_X, v12, emb_engine)
+modes = change_basis(states.inputs, v, emb_engine)
+val_modes = change_basis(val_X, v, emb_engine)
 
 # Choose eigenvector
 mode_idx = config['mode_idx']
@@ -145,7 +145,7 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
 
-    node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v12, emb_engine)
+    node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v, emb_engine)
     weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,1].mean()
     fig, auc = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
                                   val_edge_indexes[g], plot=config['plot'])
