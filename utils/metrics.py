@@ -7,6 +7,11 @@ from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
 from einops import rearrange
 
+# Configure Matplotlib to use LaTeX for text rendering
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Computer Modern Roman']
+
 
 def threshold_based_detection(signal, ground_truth, threshold=None, window_size=5, plot=False):
     """
@@ -61,28 +66,47 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     if plot:
 
         # Plot the signal
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6))
-        fig.suptitle('Threshold-based Detection')
-
+        fig, ax = plt.subplots(figsize=(10, 2))
+        ax2 = ax.twinx()
+        
+        # Plot the trajectory of the signal
         sig = signal[window_size//2:-window_size//2+1]
-        axs[0].plot(sig, label='Signal')
-        axs[0].plot(ground_truth_c, label='Ground Truth')
+        ax.plot(sig, c='yellow', label=r"$s^{(i)}(\tau)$", zorder=1, linewidth=2)
+        
+        # Plot the ground truth
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
+
+        # Create a color scale using the derivative
+        im = ax.imshow(derivative.reshape(1,-1), 
+                       cmap='viridis', aspect='auto', alpha=1, zorder=0,
+                       extent=[0, derivative.shape[0], ax.get_ylim()[0], ax.get_ylim()[1]])
+
+        # Add detected points
         det = np.zeros_like(ground_truth_c)
         det[detected] = 1
-        axs[0].plot(np.where(det, sig, np.nan), 'r.', label='Detected')
-        axs[0].set_xlabel('Time')
-        axs[0].legend()
+        ax.plot(np.where(det, sig, np.nan),
+                '*', markerfacecolor='yellow', markeredgecolor='deeppink', markersize=10,
+                label='Detected')
 
-        axs[1].plot(derivative, label='Derivative')
-        axs[1].plot(ground_truth_c, label='Ground Truth')
-        axs[1].plot(np.where(det, derivative, np.nan), 'r.', label='Detected')
-        axs[1].set_xlabel('Time')
-        axs[1].legend()
+        # Add a colorbar
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label(r'$ds^{(i)}/d\tau$')
 
-        # Print the results
-        axs[1].text(0, -0.3, f"Precision: {precision:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.4, -0.3, f"Recall: {recall:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.8, -0.3, f"F1-score: {f1_score:.2f}", transform=axs[1].transAxes)
+        # Add labels and legend
+        ax.set_xlabel(r'Time $\tau$')
+        ax.set_ylabel(r'DMD mode')
+
+        # Combine handles and labels from both axes
+        handles, labels = ax.get_legend_handles_labels()
+        handles2, labels2 = ax2.get_legend_handles_labels()
+        handles += handles2
+        labels += labels2
+
+        # Add a single legend
+        ax.legend(handles, labels)
+
+        # Hide the secondary y-axis
+        ax2.yaxis.set_visible(False)
 
         return fig, precision, recall, f1_score, baseline_f1
 
@@ -145,27 +169,46 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     if plot:
 
         # Plot the signal
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6))
-        fig.suptitle('Windowing Analysis')
+        fig, ax = plt.subplots(figsize=(10, 2))
+        ax2 = ax.twinx()
+        
+        # Plot the trajectory of the signal
+        ax.plot(signal, c='yellow', label=r"$s^{(i)}(\tau)$", zorder=1, linewidth=2)
+        
+        # Plot the ground truth
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
 
-        axs[0].plot(signal, label='Signal')
-        axs[0].plot(ground_truth_c, label='Ground Truth')
+        # Create a color scale using the derivative
+        im = ax.imshow(derivative.reshape(1,-1), 
+                       cmap='viridis', aspect='auto', alpha=1, zorder=0,
+                       extent=[0, derivative.shape[0], ax.get_ylim()[0], ax.get_ylim()[1]])
+
+        # Add detected points
         det = np.zeros_like(ground_truth_c)
         det[detected] = 1
-        axs[0].plot(np.where(det, signal, np.nan), 'r.', label='Detected')
-        axs[0].set_xlabel('Time')
-        axs[0].legend()
+        ax.plot(np.where(det, signal, np.nan),
+                '*', markerfacecolor='yellow', markeredgecolor='deeppink', markersize=10,
+                label='Detected')
 
-        axs[1].plot(derivative, label='Derivative')
-        axs[1].plot(ground_truth_c, label='Ground Truth')
-        axs[1].plot(np.where(det, derivative, np.nan), 'r.', label='Detected')
-        axs[1].set_xlabel('Time')
-        axs[1].legend()
+        # Add a colorbar
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label(r'$ds^{(i)}/d\tau$')
 
-        # Print the results
-        axs[1].text(0, -0.3, f"Precision: {precision:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.4, -0.3, f"Recall: {recall:.2f}", transform=axs[1].transAxes)
-        axs[1].text(0.8, -0.3, f"F1-score: {f1_score:.2f}", transform=axs[1].transAxes)
+        # Add labels and legend
+        ax.set_xlabel(r'Time $\tau$')
+        ax.set_ylabel(r'DMD mode')
+
+        # Combine handles and labels from both axes
+        handles, labels = ax.get_legend_handles_labels()
+        handles2, labels2 = ax2.get_legend_handles_labels()
+        handles += handles2
+        labels += labels2
+
+        # Add a single legend
+        ax.legend(handles, labels)
+
+        # Hide the secondary y-axis
+        ax2.yaxis.set_visible(False)
 
         return fig, precision, recall, f1_score, baseline_f1
 
