@@ -124,7 +124,7 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
                                 plot=config['plot'])
 
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.png")
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_thr_{mode_idx}.pdf")
     
     fig, win_prec, win_rec, win_f1, win_base = \
         windowing_analysis(val_modes[g,:,mode_idx], val_times_gt[g],
@@ -132,25 +132,25 @@ for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
                             threshold=config['threshold'],
                             plot=config['plot'])
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_win_{mode_idx}.png")
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_win_{mode_idx}.pdf")
     
     fig, cc_lag_err, corr = cross_correlation(val_modes[g,:,mode_idx], val_times_gt[g],
                                                 plot=config['plot'])
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_cc_{mode_idx}.png")
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_cc_{mode_idx}.pdf")
     
     fig, mw_p_value = mann_whitney_test(val_modes[g,:,mode_idx], val_times_gt[g], 
                                         window_size=config['window_size'],
                                         plot=config['plot'])
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.png")
+        fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.pdf")
 
     node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v, emb_engine)
     weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,mode_idx].mean()
     fig, auc = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
                                   val_edge_indexes[g], plot=config['plot'])
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/node_gt/global_dmd/{g}_mask_{mode_idx}.png")
+        fig.savefig(f"plots/{config['dataset']}/node_gt/global_dmd/{g}_mask_{mode_idx}.pdf")
     
     plt.close('all')
     
@@ -174,7 +174,7 @@ fig, mw_p_value_dt = mann_whitney_test_dataset(val_modes[val_y==1,:,mode_idx],
                                                 plot=config['plot'])
 
 if fig is not None:
-    fig.savefig(f"plots/{config['dataset']}/time_gt/dataset_mw_{mode_idx}.png")
+    fig.savefig(f"plots/{config['dataset']}/time_gt/dataset_mw_{mode_idx}.pdf")
 
 # Create a dataframe with the results
 results = pd.DataFrame({
@@ -216,7 +216,7 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     aucs2.append(auc)
 
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg2/{g}_mask.png")
+        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg2/{g}_mask.pdf")
     
     plt.close('all')
 
@@ -229,7 +229,7 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     aucs3.append(auc)
 
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg3/{g}_mask.png")
+        fig.savefig(f"plots/{config['dataset']}/edge_gt/deg3/{g}_mask.pdf")
     
     plt.close('all')
 
@@ -243,7 +243,7 @@ for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
     aucs_nodes.append(auc)
 
     if fig is not None:
-        fig.savefig(f"plots/{config['dataset']}/node_gt/local_dmd/{g}_mask.png")
+        fig.savefig(f"plots/{config['dataset']}/node_gt/local_dmd/{g}_mask.pdf")
     
     plt.close('all')
 

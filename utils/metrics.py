@@ -77,7 +77,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
-        im = ax.imshow(derivative.reshape(1,-1), 
+        im = ax.imshow(np.abs(derivative.reshape(1,-1)), 
                        cmap='viridis', aspect='auto', alpha=1, zorder=0,
                        extent=[0, derivative.shape[0], ax.get_ylim()[0], ax.get_ylim()[1]])
 
@@ -90,11 +90,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$ds^{(i)}/d\tau$')
+        cbar.set_label(r'$w_t^{(i)}(\tau)$')
 
         # Add labels and legend
         ax.set_xlabel(r'Time $\tau$')
-        ax.set_ylabel(r'DMD mode')
 
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
@@ -107,6 +106,9 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
+
+        # Adjust layout
+        plt.tight_layout()
 
         return fig, precision, recall, f1_score, baseline_f1
 
@@ -192,11 +194,10 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$ds^{(i)}/d\tau$')
+        cbar.set_label(r'$w_t^{(i)}(\tau)$')
 
         # Add labels and legend
         ax.set_xlabel(r'Time $\tau$')
-        ax.set_ylabel(r'DMD mode')
 
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
@@ -209,6 +210,9 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
+
+        # Adjust layout
+        plt.tight_layout()
 
         return fig, precision, recall, f1_score, baseline_f1
 
