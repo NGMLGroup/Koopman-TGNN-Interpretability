@@ -66,7 +66,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     if plot:
 
         # Plot the signal
-        fig, ax = plt.subplots(figsize=(10, 2))
+        fig, ax = plt.subplots(figsize=(8, 2))
         ax2 = ax.twinx()
         
         # Plot the trajectory of the signal
@@ -98,14 +98,16 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
         handles2, labels2 = ax2.get_legend_handles_labels()
-        handles += handles2
-        labels += labels2
+        handles2 += handles
+        labels2 += labels
 
         # Add a single legend
-        ax.legend(handles, labels)
+        ax2.legend(handles2, labels2)
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
+        # Move the colorbar out of the plot
+        cbar.ax.set_position([1.001, 0.275, 0.05, 0.65])
 
         # Adjust layout
         plt.tight_layout()
@@ -171,7 +173,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     if plot:
 
         # Plot the signal
-        fig, ax = plt.subplots(figsize=(10, 2))
+        fig, ax = plt.subplots(figsize=(8, 2))
         ax2 = ax.twinx()
         
         # Plot the trajectory of the signal
@@ -202,17 +204,19 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
         handles2, labels2 = ax2.get_legend_handles_labels()
-        handles += handles2
-        labels += labels2
+        handles2 += handles
+        labels2 += labels
 
         # Add a single legend
-        ax.legend(handles, labels)
+        ax2.legend(handles2, labels2)
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
 
         # Adjust layout
         plt.tight_layout()
+        # Move the colorbar out of the plot
+        cbar.ax.set_position([1.001, 0.275, 0.05, 0.65])
 
         return fig, precision, recall, f1_score, baseline_f1
 
