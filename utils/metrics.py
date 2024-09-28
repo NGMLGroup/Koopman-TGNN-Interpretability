@@ -32,7 +32,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         figure: The plot of the signal and derivative.
     """
 
-    derivative = np.gradient(signal)
+    derivative = np.abs(np.gradient(signal))
     
     if threshold is None:
         threshold = np.mean(derivative) + np.std(derivative)
@@ -44,7 +44,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     ground_truth_i = np.where(ground_truth_c > 0)[0]
     
     derivative = derivative[window_size//2:-window_size//2+1]
-    detected = np.where(np.abs(derivative) > threshold)[0]
+    detected = np.where(derivative > threshold)[0]
 
     true_positives = np.intersect1d(detected, ground_truth_i)
     false_positives = np.setdiff1d(detected, ground_truth_i)
@@ -77,7 +77,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
-        im = ax.imshow(np.abs(derivative.reshape(1,-1)), 
+        im = ax.imshow(derivative.reshape(1,-1), 
                        cmap='viridis', aspect='auto', alpha=1, zorder=0,
                        extent=[0, derivative.shape[0], ax.get_ylim()[0], ax.get_ylim()[1]])
 
@@ -102,15 +102,16 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         labels2 += labels
 
         # Add a single legend
-        ax2.legend(handles2, labels2)
+        ax2.legend(handles2, labels2, loc='upper left')
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
-        # Move the colorbar out of the plot
-        cbar.ax.set_position([1.001, 0.275, 0.05, 0.65])
 
         # Adjust layout
         plt.tight_layout()
+
+        # Move the colorbar out of the plot
+        cbar.ax.set_position([1.001, 0.275, 0.05, 0.65])
 
         return fig, precision, recall, f1_score, baseline_f1
 
@@ -140,14 +141,14 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
     # Moving average
     signal = np.convolve(signal, np.ones(window_size)/window_size, mode='valid')
-    derivative = np.gradient(signal)
+    derivative = np.abs(np.gradient(signal))
     
     if threshold is None:
         threshold = np.mean(derivative) + np.std(derivative)
     else:
         threshold = threshold * np.max(derivative)
     
-    detected = np.where(np.abs(derivative) > threshold)[0]
+    detected = np.where(derivative > threshold)[0]
     
     filter = np.ones(window_size)
     ground_truth_c = np.convolve(ground_truth, filter, mode='valid')
@@ -208,13 +209,14 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         labels2 += labels
 
         # Add a single legend
-        ax2.legend(handles2, labels2)
+        ax2.legend(handles2, labels2, loc='upper left')
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
 
         # Adjust layout
         plt.tight_layout()
+        
         # Move the colorbar out of the plot
         cbar.ax.set_position([1.001, 0.275, 0.05, 0.65])
 
