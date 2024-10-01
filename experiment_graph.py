@@ -1,4 +1,5 @@
 import torch
+import wandb
 import random
 import sys
 import os
@@ -40,12 +41,39 @@ except FileNotFoundError:
 # Select the dataset
 parser = argparse.ArgumentParser(description='Experiment graph')
 parser.add_argument('--dataset', type=str, default='tumblr_ct1', help='Name of the dataset')
+parser.add_argument('--threshold', type=float, default=None, help='Threshold for the threshold-based detection')
+parser.add_argument('--window_size', type=int, default=5, help='Window size for the windowing analysis')
+parser.add_argument('--plot', type=bool, default=False, help='Plot the results')
+parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
 
 args = parser.parse_args()
 dataset_name = args.dataset
 
+# Load configuration from JSON file
+config_file = 'configs/GCRN_config.json'
+with open(config_file, 'r') as f:
+    configs = json.load(f)
 # Retrieve the configuration for the selected dataset
-config = configs[dataset_name]
+if dataset_name not in configs:
+    raise ValueError(f"Hyperparameters for dataset {dataset_name} are missing.")
+
+if not args.sweep:
+    # If it's not a sweep, load from json
+    config = configs[dataset_name]
+else:
+    # If it's a sweep, overwrite json configs with args
+    config = configs[dataset_name]
+    for key, value in vars(args).items():
+        if value is not None:
+            config[key] = value
+
+wandb.init(project="koopman", config=config)
+config = wandb.config
+
+# Check used configs
+print("WandB Configuration Summary:")
+for key, value in config.items():
+    print(f"{key}: {value}")
 
 seed = config['seed']
 random.seed(seed)
@@ -113,7 +141,7 @@ r_cross, r_corr = [], []
 r_mann = []
 aucs_nodes = []
 
-for g in tqdm(range(len(val_modes)), desc='Time', leave=False):
+for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
 
     if val_y[g]==0 or (val_times_gt[g] == 0).all():
         continue
@@ -201,7 +229,7 @@ results.to_excel(writer, sheet_name=f"time_gt_{config['dataset']}", index=False)
 # Spatial ground truth analysis
 aucs2, aucs3 = [], []
 aucs_nodes = []
-for g in tqdm(range(len(edges_gt)), desc='Topology', leave=False):
+for g in tqdm(range(len(edges_gt)), desc='Whole dataset', leave=False):
 
     if states.targets[g]==0 or torch.sum(edges_gt[g]) == 0:
         continue
