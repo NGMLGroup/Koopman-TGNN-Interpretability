@@ -221,6 +221,10 @@ results = pd.DataFrame({
     'auc_nodes': aucs_nodes
 })
 
+# Log on wandb the averages
+for key in results.columns:
+    wandb.log({f"{key}_avg": np.asarray(results[key]).mean()})
+
 # Save the dataframe to an Excel file in a new sheet
 writer = pd.ExcelWriter(path='results.xlsx', engine='xlsxwriter')
 results.to_excel(writer, sheet_name=f"time_gt_{config['dataset']}", index=False)
