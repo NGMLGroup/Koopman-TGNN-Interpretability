@@ -11,6 +11,7 @@ import json
 import argparse
 
 from sklearn.model_selection import train_test_split
+from typing import Optional
 from dataset.utils import (load_classification_dataset,
                             process_classification_dataset,
                             ground_truth)
@@ -41,12 +42,17 @@ except FileNotFoundError:
 # Select the dataset
 parser = argparse.ArgumentParser(description='Experiment graph')
 parser.add_argument('--dataset', type=str, default='tumblr_ct1', help='Name of the dataset')
-parser.add_argument('--threshold', type=float, default=None, help='Threshold for the threshold-based detection')
+parser.add_argument('--threshold', default='None', help='Threshold for the threshold-based detection')
 parser.add_argument('--window_size', type=int, default=5, help='Window size for the windowing analysis')
 parser.add_argument('--plot', type=bool, default=False, help='Plot the results')
 parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
 
 args = parser.parse_args()
+# Handle the None case for threshold
+if args.threshold.lower() == 'none':
+    args.threshold = None
+else:
+    args.threshold = float(args.threshold)
 dataset_name = args.dataset
 
 # Load configuration from JSON file
