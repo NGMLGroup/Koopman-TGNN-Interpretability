@@ -155,6 +155,7 @@ for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
     fig, thr_prec, thr_rec, thr_f1, thr_base = \
         threshold_based_detection(val_modes[g,:,mode_idx], val_times_gt[g], 
                                 threshold=config['threshold'],
+                                window_size=config['window_size'],
                                 plot=config['plot'])
 
     if fig is not None:
