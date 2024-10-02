@@ -370,7 +370,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
             r"$f_{gt}(t)$": gt_derivative_values,
             r"$f_{r}(t)$": random_derivative_values
         }
-        df = pd.DataFrame(data)
+        data = pd.DataFrame(data)
 
         fig, axs = plt.subplots(1, 1, figsize=(5, 4))
 
