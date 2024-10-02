@@ -1,13 +1,16 @@
 program: experiment_graph.py
 method: grid
 project: "koopman"
-
+command:
+  - ${interpreter}
+  - ${program}
+  - ${args_no_boolean_flags}
     
 parameters:
     dataset:
-        value: "facebook_ct1"
+        value: "dblp_ct1"
     threshold:
-        values: [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 'None']
+        values: ['None', 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     window_size:
         values: [2, 3, 4, 5, 6]
     sweep:

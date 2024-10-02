@@ -44,10 +44,11 @@ parser = argparse.ArgumentParser(description='Experiment graph')
 parser.add_argument('--dataset', type=str, default='tumblr_ct1', help='Name of the dataset')
 parser.add_argument('--threshold', default='None', help='Threshold for the threshold-based detection')
 parser.add_argument('--window_size', type=int, default=5, help='Window size for the windowing analysis')
-parser.add_argument('--plot', type=bool, default=False, help='Plot the results')
-parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
+parser.add_argument('--plot', action=argparse.BooleanOptionalAction, help='Plot the results')
+parser.add_argument('--sweep', action=argparse.BooleanOptionalAction, help='Sweep')
 
 args = parser.parse_args()
+
 # Handle the None case for threshold
 if args.threshold.lower() == 'none':
     args.threshold = None
@@ -70,16 +71,14 @@ else:
     # If it's a sweep, overwrite json configs with args
     config = configs[dataset_name]
     for key, value in vars(args).items():
-        if value is not None:
-            config[key] = value
+        config[key] = value
 
 wandb.init(project="koopman", config=config)
-config = wandb.config
 
 # Check used configs
 print("WandB Configuration Summary:")
 for key, value in config.items():
-    print(f"{key}: {value}")
+    print(f"{key} ({type(value)}): {value}")
 
 seed = config['seed']
 random.seed(seed)
