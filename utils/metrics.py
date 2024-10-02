@@ -2,6 +2,8 @@ import random
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 from scipy.stats import mannwhitneyu
 from sklearn.model_selection import train_test_split
@@ -332,7 +334,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
     ground_truth_instants = np.where(ground_truth > 0)[0]
 
     # Compute the derivative of the signal
-    derivative = np.diff(signal)
+    derivative = np.abs(np.diff(signal))
 
     # Define a window size around each instant
     half_window = window_size // 2
@@ -342,7 +344,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
     for gt in ground_truth_instants:
         window_start = max(0, gt - half_window)
         window_end = min(len(derivative), gt + half_window)
-        gt_derivative_values.extend(np.abs(derivative[window_start:window_end]))
+        gt_derivative_values.extend(derivative[window_start:window_end])
 
     # Extract derivative values around random instants
     # Choose a number of random instants, here we choose the same number as ground-truth instants for consistency
@@ -354,22 +356,35 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
     for ri in random_instants:
         window_start = max(0, ri - half_window)
         window_end = min(len(derivative), ri + half_window)
-        random_derivative_values.extend(np.abs(derivative[window_start:window_end]))
+        random_derivative_values.extend(derivative[window_start:window_end])
 
     # Perform Mann-Whitney U test
     stat, MW_U_test_p_value = mannwhitneyu(gt_derivative_values, random_derivative_values, alternative='greater')
 
     if plot:
+        
+        sns.set_style('darkgrid')
 
-        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
-        fig.suptitle('Mann-Whitney U Test')
+        # Create a DataFrame from the sample data
+        data = {
+            r"$f_{gt}(t)$": gt_derivative_values,
+            r"$f_{r}(t)$": random_derivative_values
+        }
+        df = pd.DataFrame(data)
 
-        axs.hist(gt_derivative_values, bins=20, alpha=0.5, label='Ground Truth')
-        axs.hist(random_derivative_values, bins=20, alpha=0.5, label='Random')
-        axs.set_xlabel('Derivative Values')
+        fig, axs = plt.subplots(1, 1, figsize=(5, 4))
+
+        axs.hist(data, x=r"$f_{gt}(t)$", bins=20, alpha=0.7, 
+                 color='skyblue', edgecolor='black')
+        axs.hist(data, x=r"$f_{r}(t)$", bins=20, alpha=0.7, 
+                 color='salmon', edgecolor='black')
+        
+        axs.set_xlabel(r"w_\tau^{(i)}", fontsize=14)
+
         axs.legend()
 
-        axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
+        # Add grid lines
+        axs.grid(True, linestyle='--', alpha=0.7)
 
         return fig, MW_U_test_p_value
 
