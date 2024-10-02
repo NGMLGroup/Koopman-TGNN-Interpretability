@@ -71,10 +71,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         
         # Plot the trajectory of the signal
         sig = signal[window_size//2:-window_size//2+1]
-        ax.plot(sig, c='yellow', label=r"$s^{(i)}(\tau)$", zorder=1, linewidth=2)
+        ax.plot(sig, c='yellow', label=r"$s^{(i)}(t)$", zorder=1, linewidth=2)
         
         # Plot the ground truth
-        ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\tau(t)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
         im = ax.imshow(derivative.reshape(1,-1), 
@@ -90,10 +90,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$w_t^{(i)}(\tau)$')
+        cbar.set_label(r'$w_\tau^{(i)}(t)$')
 
         # Add labels and legend
-        ax.set_xlabel(r'Time $\tau$')
+        ax.set_xlabel(r'Time $t$')
 
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
@@ -178,10 +178,10 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         ax2 = ax.twinx()
         
         # Plot the trajectory of the signal
-        ax.plot(signal, c='yellow', label=r"$s^{(i)}(\tau)$", zorder=1, linewidth=2)
+        ax.plot(signal, c='yellow', label=r"$s^{(i)}(t)$", zorder=1, linewidth=2)
         
         # Plot the ground truth
-        ax2.plot(ground_truth_c, c='orangered', label=r"$m_t(\tau)$", zorder=1, linewidth=2)
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\tau(t)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
         im = ax.imshow(derivative.reshape(1,-1), 
@@ -197,10 +197,10 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$w_t^{(i)}(\tau)$')
+        cbar.set_label(r'$w_\tau^{(i)}(t)$')
 
         # Add labels and legend
-        ax.set_xlabel(r'Time $\tau$')
+        ax.set_xlabel(r'Time $t$')
 
         # Combine handles and labels from both axes
         handles, labels = ax.get_legend_handles_labels()
