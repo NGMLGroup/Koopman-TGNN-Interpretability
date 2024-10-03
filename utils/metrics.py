@@ -109,6 +109,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
 
+        # Remove grid lines
+        ax.grid(False)
+        ax2.grid(False)
+
         # Adjust layout
         plt.tight_layout()
 
@@ -215,6 +219,10 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         # Hide the secondary y-axis
         ax2.yaxis.set_visible(False)
+        
+        # Remove grid lines
+        ax.grid(False)
+        ax2.grid(False)
 
         # Adjust layout
         plt.tight_layout()
@@ -366,20 +374,26 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
         sns.set_style('darkgrid')
 
         # Create a DataFrame from the sample data
-        data = {
-            r"$f_{gt}(t)$": gt_derivative_values,
+        data_gt = {
+            r"$f_{gt}(t)$": gt_derivative_values
+        }
+        data_gt = pd.DataFrame(data_gt)
+        data_r = {
             r"$f_{r}(t)$": random_derivative_values
         }
-        data = pd.DataFrame(data)
+        data_r = pd.DataFrame(data_r)
 
         fig, axs = plt.subplots(1, 1, figsize=(5, 4))
 
-        axs.hist(data, x=r"$f_{gt}(t)$", bins=20, alpha=0.7, 
-                 color='skyblue', edgecolor='black')
-        axs.hist(data, x=r"$f_{r}(t)$", bins=20, alpha=0.7, 
-                 color='salmon', edgecolor='black')
+        sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
+                     label=r"$f_{gt}(t)$",
+                     color='skyblue', edgecolor='black', ax=axs)
+        sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
+                     label=r"$f_{r}(t)$",
+                     color='salmon', edgecolor='black', ax=axs)
         
-        axs.set_xlabel(r"w_\tau^{(i)}", fontsize=14)
+        axs.set_xlabel(r"$w_\tau^{(i)}$", fontsize=14)
+        axs.set_ylabel('', fontsize=14)
 
         axs.legend()
 
@@ -445,16 +459,35 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
     stat, MW_U_test_p_value = mannwhitneyu(gt_derivative_values, random_derivative_values, alternative='greater')
 
     if plot:
+        
+        sns.set_style('darkgrid')
 
-        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
-        fig.suptitle('Mann-Whitney U Test')
+        # Create a DataFrame from the sample data
+        data_gt = {
+            r"$f_{gt}(t)$": gt_derivative_values
+        }
+        data_gt = pd.DataFrame(data_gt)
+        data_r = {
+            r"$f_{r}(t)$": random_derivative_values
+        }
+        data_r = pd.DataFrame(data_r)
 
-        axs.hist(gt_derivative_values, bins=20, alpha=0.5, label='Ground Truth')
-        axs.hist(random_derivative_values, bins=20, alpha=0.5, label='Random')
-        axs.set_xlabel('Derivative Values')
+        fig, axs = plt.subplots(1, 1, figsize=(5, 4))
+
+        sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
+                     label=r"$f_{gt}(t)$",
+                     color='skyblue', edgecolor='black', ax=axs)
+        sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
+                     label=r"$f_{r}(t)$",
+                     color='salmon', edgecolor='black', ax=axs)
+        
+        axs.set_xlabel(r"$w_\tau^{(i)}$", fontsize=14)
+        axs.set_ylabel('', fontsize=14)
+
         axs.legend()
 
-        axs.text(0.6, 0.8, f"Mann-Whitney p-value: {MW_U_test_p_value:.2f}", transform=axs.transAxes)
+        # Add grid lines
+        axs.grid(True, linestyle='--', alpha=0.7)
 
         return fig, MW_U_test_p_value
 
