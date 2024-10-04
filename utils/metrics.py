@@ -371,7 +371,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
 
     if plot:
         
-        sns.set_style('darkgrid')
+        # sns.set_style('darkgrid')
 
         # Create a DataFrame from the sample data
         data_gt = {
@@ -398,7 +398,7 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
         axs.legend()
 
         # Add grid lines
-        axs.grid(True, linestyle='--', alpha=0.7)
+        # axs.grid(True, linestyle='--', alpha=0.7)
 
         return fig, MW_U_test_p_value
 
@@ -460,7 +460,7 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
 
     if plot:
         
-        sns.set_style('darkgrid')
+        # sns.set_style('darkgrid')
 
         # Create a DataFrame from the sample data
         data_gt = {
@@ -487,109 +487,12 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
         axs.legend()
 
         # Add grid lines
-        axs.grid(True, linestyle='--', alpha=0.7)
+        # axs.grid(True, linestyle='--', alpha=0.7)
 
         return fig, MW_U_test_p_value
 
     # If p-value is less than 0.05, we reject the null hypothesis that the two distributions are the same    
     return None, MW_U_test_p_value
-
-
-def ml_probes(signal, ground_truth, seed=42, verbose=False):
-    """
-    Train a classifier to detect changes in the derivative of the signal 
-    that correspond to ground-truth events.
-    Use features derived from the derivative signal (e.g., derivative) 
-    in a time window around each ground-truth instant.
-
-    Args:
-        signal (np.ndarray): The time signal.
-        ground_truth (np.ndarray): The ground-truth signal.
-        seed (int, optional): Random seed for reproducibility. Defaults to 42.
-        verbose (bool, optional): Whether to print classification reports. Defaults to False.
-
-    Returns:
-        dict: ROC AUC scores for Random Forest and Logistic Regression classifiers.
-    """
-    
-    # Extract features and labels
-    window_size = 5
-
-    # Compute derivative and stack features
-    derivative = np.gradient(signal, axis=1)
-    signal = signal[:,:derivative.shape[1]]  # Match the length of the derivative
-
-    features = np.concatenate((signal, derivative), axis=-1)
-
-    def extract_features(features, idx, window_size):
-        start = idx
-        end = idx + window_size
-        
-        return features[:,start:end,:]
-
-    inputs = []
-    for idx in range(features.shape[1] - window_size + 1):
-        inputs.append(extract_features(features, idx, window_size))
-
-    inputs = np.array(inputs)
-    labels = ground_truth[:,:inputs.shape[0]]  # Match the length of features
-    labels = np.heaviside(labels, 0)
-
-    inputs = rearrange(inputs, 'b t w f -> (b t) (w f)')
-    labels = rearrange(labels, 'b t -> (b t)')
-
-    # Split data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(inputs, labels, test_size=0.3, random_state=seed)
-
-    # Train a Random Forest classifier
-    random_forest_results = random_forest(X_train, X_test, y_train, y_test, verbose, seed)
-
-    # Train a Logistic Regression classifier
-    log_regr_results = logistic_regression(X_train, X_test, y_train, y_test, verbose, seed)
-
-    return {**random_forest_results, **log_regr_results}
-
-
-def random_forest(X_train, X_test, y_train, y_test, verbose, seed):
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.metrics import classification_report, roc_auc_score
-
-    # Train a Random Forest classifier
-    clf = RandomForestClassifier(n_estimators=100, random_state=seed)
-    clf.fit(X_train, y_train)
-
-    # Predict on the test set
-    y_pred = clf.predict(X_test)
-    y_pred_proba = clf.predict_proba(X_test)[:, 1]
-
-    # Evaluate the model
-    if verbose:
-        print(classification_report(y_test, y_pred))
-
-    random_forest_roc_auc = roc_auc_score(y_test.squeeze(), y_pred_proba)
-
-    return {'random_forest_roc_auc': random_forest_roc_auc}
-
-
-def logistic_regression(X_train, X_test, y_train, y_test, verbose, seed):
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import classification_report, roc_auc_score
-
-    # Train a Logistic Regression classifier
-    clf = LogisticRegression(random_state=seed, max_iter=10000)
-    clf.fit(X_train, y_train)
-
-    # Predict on the test set
-    y_pred = clf.predict(X_test)
-    y_pred_proba = clf.predict_proba(X_test)[:, 1]
-
-    # Evaluate the model
-    if verbose:
-        print(classification_report(y_test, y_pred))
-    
-    log_regr_roc_auc = roc_auc_score(y_test.squeeze(), y_pred_proba)
-    
-    return {'log_regr_roc_auc': log_regr_roc_auc}
 
 
 def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
@@ -617,7 +520,7 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
     auc_score = roc_auc_score(edge_gt, weights)
 
     if plot:
-        fig = plt.figure(figsize=(8, 7))
+        fig = plt.figure(figsize=(4, 3.5))
 
         # Create the main plot axis
         axs = fig.add_axes([0.1, 0.1, 1, 1])  # [left, bottom, width, height] in figure coordinates
@@ -637,13 +540,13 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
         cmap = matplotlib.colormaps.get_cmap('turbo')
         norm = plt.Normalize(min(weights), max(weights))
         nx.draw_networkx_nodes(G, pos, ax=axs, 
-                               node_color='lightblue', node_size=200)
+                               node_color='lightblue', node_size=100)
         pax = nx.draw_networkx_edges(G, pos, ax=axs,
                                      arrows=False,
                                      edge_color=norm(weights), 
                                      edge_cmap=cmap,
                                      edge_vmin=0, edge_vmax=1,
-                                     width=4)
+                                     width=2)
         
         plt.colorbar(pax, ax=axs, aspect=40)
 
@@ -655,7 +558,7 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
         G_gt.add_nodes_from(range(num_nodes))
         G_gt.add_edges_from(edge_index.T.tolist())
         nx.draw_networkx_nodes(G_gt, pos, ax=inset_ax, 
-                               node_color='lightblue', node_size=20)
+                               node_color='lightblue', node_size=10)
         colors = ['r' if edge else 'lightblue' for edge in edge_gt.tolist()]
         nx.draw_networkx_edges(G_gt, pos, ax=inset_ax, 
                                arrows=False,
@@ -690,7 +593,7 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
     auc_score = roc_auc_score(node_gt, weights)
 
     if plot:
-        fig = plt.figure(figsize=(8, 7))
+        fig = plt.figure(figsize=(4, 3.5))
 
         # Create the main plot axis
         axs = fig.add_axes([0.1, 0.1, 1, 1])  # [left, bottom, width, height] in figure coordinates
@@ -713,10 +616,10 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
         pax = nx.draw_networkx_nodes(G, pos, ax=axs, 
                                      node_color=norm(weights), 
                                      cmap=cmap, vmin=0, vmax=1, 
-                                     node_size=200)
+                                     node_size=100)
         nx.draw_networkx_edges(G, pos, ax=axs,
                                arrows=False,
-                               edge_color='lightblue', width=4)
+                               edge_color='lightblue', width=2)
 
         plt.colorbar(pax, ax=axs, aspect=40)        
         
@@ -729,10 +632,10 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
         G_gt.add_edges_from(edge_index.T.tolist())
         colors = ['r' if node else 'lightblue' for node in node_gt.tolist()]
         nx.draw_networkx_nodes(G_gt, pos, ax=inset_ax, 
-                               node_color=colors, node_size=200)
+                               node_color=colors, node_size=10)
         nx.draw_networkx_edges(G_gt, pos, ax=inset_ax,
                                arrows=False, 
-                               edge_color='lightblue', width=4)
+                               edge_color='lightblue', width=1)
 
         return fig, auc_score
     
