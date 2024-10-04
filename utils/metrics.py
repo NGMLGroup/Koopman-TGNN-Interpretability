@@ -617,13 +617,15 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
     auc_score = roc_auc_score(edge_gt, weights)
 
     if plot:
-        fig, axs = plt.subplots(1, 2, figsize=(16, 7))
-        fig.suptitle(f'Graph AUC Analysis: {auc_score:.2f}')
+        fig = plt.figure(figsize=(8, 7))
+
+        # Create the main plot axis
+        axs = fig.add_axes([0.1, 0.1, 1, 1])  # [left, bottom, width, height] in figure coordinates
+
         G = nx.DiGraph()
 
         # Add nodes
         G.add_nodes_from(range(num_nodes))
-        n_labels = {i: str(i) for i in range(num_nodes)}
 
         # Add edges
         edge_index = torch.cat(edge_index, dim=1)
@@ -632,25 +634,32 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
 
         # Plot the graph
         pos = nx.kamada_kawai_layout(G)
-        cmap = matplotlib.colormaps.get_cmap('viridis')
-        pax = nx.draw_networkx_nodes(G, pos, ax=axs[0], node_color='lightblue', node_size=200)
+        cmap = matplotlib.colormaps.get_cmap('turbo')
         norm = plt.Normalize(min(weights), max(weights))
-        colors = [cmap(norm(w)) for w in weights]
-        nx.draw_networkx_edges(G, pos, ax=axs[0], edge_color=colors, width=4)
-        n_labels = {i: str(i) for i in range(num_nodes)}
-        nx.draw_networkx_labels(G, pos, n_labels, ax=axs[0], font_size=10,font_color='r')
-        axs[0].set_title('Graph with weights')
+        nx.draw_networkx_nodes(G, pos, ax=axs, 
+                               node_color='lightblue', node_size=200)
+        pax = nx.draw_networkx_edges(G, pos, ax=axs,
+                                     arrows=False,
+                                     edge_color=norm(weights), 
+                                     edge_cmap=cmap,
+                                     edge_vmin=0, edge_vmax=1,
+                                     width=4)
+        
+        plt.colorbar(pax, ax=axs, aspect=40)
+
+        # Create an inset axis within the first axis
+        inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
 
         # Plot the ground truth
         G_gt = nx.DiGraph()
         G_gt.add_nodes_from(range(num_nodes))
         G_gt.add_edges_from(edge_index.T.tolist())
-        nx.draw_networkx_nodes(G_gt, pos, ax=axs[1], node_color='lightblue', node_size=200)
+        nx.draw_networkx_nodes(G_gt, pos, ax=inset_ax, 
+                               node_color='lightblue', node_size=20)
         colors = ['r' if edge else 'lightblue' for edge in edge_gt.tolist()]
-        nx.draw_networkx_edges(G_gt, pos, ax=axs[1], edge_color=colors, width=4)
-        axs[1].set_title('Ground Truth Graph')
-
-        plt.colorbar(pax, ax=axs[0])
+        nx.draw_networkx_edges(G_gt, pos, ax=inset_ax, 
+                               arrows=False,
+                               edge_color=colors, width=1)
 
         return fig, auc_score
     
@@ -681,8 +690,11 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
     auc_score = roc_auc_score(node_gt, weights)
 
     if plot:
-        fig, axs = plt.subplots(1, 2, figsize=(16, 7))
-        fig.suptitle(f'Graph AUC Analysis: {auc_score:.2f}')
+        fig = plt.figure(figsize=(8, 7))
+
+        # Create the main plot axis
+        axs = fig.add_axes([0.1, 0.1, 1, 1])  # [left, bottom, width, height] in figure coordinates
+
         G = nx.DiGraph()
 
         # Add edges
@@ -693,29 +705,34 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
         # Add nodes
         num_nodes = edge_index.max().item() + 1
         G.add_nodes_from(range(num_nodes))
-        n_labels = {i: str(i) for i in range(num_nodes)}
 
         # Plot the graph
         pos = nx.kamada_kawai_layout(G)
-        cmap = matplotlib.colormaps.get_cmap('viridis')
+        cmap = matplotlib.colormaps.get_cmap('turbo')
         norm = plt.Normalize(min(weights), max(weights))
-        colors = [cmap(norm(w)) for w in weights]
-        pax = nx.draw_networkx_nodes(G, pos, ax=axs[0], node_color=colors, node_size=200)
-        nx.draw_networkx_edges(G, pos, ax=axs[0], edge_color='lightblue', width=4)
-        n_labels = {i: str(i) for i in range(num_nodes)}
-        nx.draw_networkx_labels(G, pos, n_labels, ax=axs[0], font_size=10,font_color='r')
-        axs[0].set_title('Graph with weights')
+        pax = nx.draw_networkx_nodes(G, pos, ax=axs, 
+                                     node_color=norm(weights), 
+                                     cmap=cmap, vmin=0, vmax=1, 
+                                     node_size=200)
+        nx.draw_networkx_edges(G, pos, ax=axs,
+                               arrows=False,
+                               edge_color='lightblue', width=4)
 
-        # Plot the ground truth % FIXME: Check if this is correct
+        plt.colorbar(pax, ax=axs, aspect=40)        
+        
+        # Create an inset axis for ground truth
+        inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
+
+        # Plot the ground truth
         G_gt = nx.DiGraph()
         G_gt.add_nodes_from(range(num_nodes))
         G_gt.add_edges_from(edge_index.T.tolist())
         colors = ['r' if node else 'lightblue' for node in node_gt.tolist()]
-        nx.draw_networkx_nodes(G_gt, pos, ax=axs[1], node_color=colors, node_size=200)
-        nx.draw_networkx_edges(G_gt, pos, ax=axs[1], edge_color='lightblue', width=4)
-        axs[1].set_title('Ground Truth Graph')
-
-        plt.colorbar(pax, ax=axs[0])
+        nx.draw_networkx_nodes(G_gt, pos, ax=inset_ax, 
+                               node_color=colors, node_size=200)
+        nx.draw_networkx_edges(G_gt, pos, ax=inset_ax,
+                               arrows=False, 
+                               edge_color='lightblue', width=4)
 
         return fig, auc_score
     
