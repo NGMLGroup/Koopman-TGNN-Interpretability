@@ -31,14 +31,18 @@ parser.add_argument('--rnn_layers', type=int, default=1, help='Number of RNN lay
 parser.add_argument('--readout_layers', type=int, default=1, help='Number of readout layers')
 parser.add_argument('--dim_red', type=int, default=16, help='Dimensionality reduction')
 parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay')
-parser.add_argument('--step_size', type=int, default=20, help='Early-stop step size')
-parser.add_argument('--gamma', type=float, default=0.5, help='Early-stop gamma')
+parser.add_argument('--step_size', type=int, default=20, help='LR decay step size')
+parser.add_argument('--gamma', type=float, default=0.5, help='LR decay gamma')
 parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
 parser.add_argument('--verbose', type=bool, default=True, help='Verbose')
 parser.add_argument('--self_loop', type=bool, default=False, help='Self loop')
 parser.add_argument('--cell_type', type=str, default='lstm', help='Cell type')
 parser.add_argument('--cat_states_layers', type=bool, default=True, help='Concatenation of states')
 parser.add_argument('--beta', type=float, default=0.1, help='Weight of the ridge loss')
+parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
+parser.add_argument('--max_epochs', type=int, default=200, help='Max number of epochs')
+parser.add_argument('--patience', type=int, default=30, help='Patience')
+parser.add_argument('--min_delta', type=float, default=1e-5, help='Min delta')
 
 args = parser.parse_args()
 dataset_name = args.dataset
@@ -91,7 +95,7 @@ dataset = DynGraphDataset(edge_indexes, node_labels)
 # Split dataset into train and validation sets
 train_x, val_x, train_y, val_y = train_test_split(dataset, graph_labels, test_size=0.2, stratify=graph_labels, random_state=seed)
 
-batch_size = 16
+batch_size = config.batch_size
 train_x_batches = [DisjointBatch.from_data_list(train_x[i:i+batch_size]) for i in range(0, len(train_x), batch_size)]
 train_y_batches = [train_y[i:i+batch_size] for i in range(0, len(train_y), batch_size)]
 val_x_batches = [DisjointBatch.from_data_list(val_x[i:i+batch_size]) for i in range(0, len(val_x), batch_size)]
@@ -120,11 +124,11 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.step_siz
 model.train()
 
 # Train the model
-num_epochs = 200
+num_epochs = config.max_epochs
 best_loss = float('inf')
-patience = 30
+patience = config.patience
 counter = 0
-min_delta = 1e-5
+min_delta = config.min_delta
 
 for epoch in tqdm(range(num_epochs), desc='Training', position=0, leave=True):
     for x, y in tqdm(zip(train_x_batches, train_y_batches), position=1, leave=False):
