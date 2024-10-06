@@ -386,9 +386,11 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
         fig, axs = plt.subplots(1, 1, figsize=(5, 4))
 
         sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
+                     kde=True,
                      label=r"$f_{gt}(t)$",
                      color='skyblue', edgecolor='black', ax=axs)
         sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
+                     kde=True,
                      label=r"$f_{r}(t)$",
                      color='salmon', edgecolor='black', ax=axs)
         
@@ -475,9 +477,11 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
         fig, axs = plt.subplots(1, 1, figsize=(5, 4))
 
         sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
+                     kde=True,
                      label=r"$f_{gt}(t)$",
                      color='skyblue', edgecolor='black', ax=axs)
         sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
+                     kde=True,
                      label=r"$f_{r}(t)$",
                      color='salmon', edgecolor='black', ax=axs)
         
@@ -548,7 +552,8 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
                                      edge_vmin=0, edge_vmax=1,
                                      width=2)
         
-        plt.colorbar(pax, ax=axs, aspect=40)
+        cbar = plt.colorbar(pax, ax=axs, aspect=40)
+        cbar.set_label(r'$w_e(n,m)$')
 
         # Create an inset axis within the first axis
         inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
@@ -621,7 +626,8 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
                                arrows=False,
                                edge_color='lightblue', width=2)
 
-        plt.colorbar(pax, ax=axs, aspect=40)        
+        cbar = plt.colorbar(pax, ax=axs, aspect=40)
+        cbar.set_label(r'$w_s^{(i)}(n)$')    
         
         # Create an inset axis for ground truth
         inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
