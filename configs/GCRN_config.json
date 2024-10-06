@@ -129,7 +129,7 @@
         "K_type": "data",
         "testing": false,
         "seed": 42,
-        "threshold": 0.4,
+        "threshold": null,
         "window_size": 6,
         "plot": true,
         "self_loop": false,
