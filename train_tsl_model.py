@@ -33,7 +33,6 @@ parser.add_argument('--dim_red', type=int, default=16, help='Dimensionality redu
 parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay')
 parser.add_argument('--step_size', type=int, default=20, help='LR decay step size')
 parser.add_argument('--gamma', type=float, default=0.5, help='LR decay gamma')
-parser.add_argument('--sweep', type=bool, default=False, help='Sweep')
 parser.add_argument('--verbose', type=bool, default=True, help='Verbose')
 parser.add_argument('--self_loop', type=bool, default=False, help='Self loop')
 parser.add_argument('--cell_type', type=str, default='lstm', help='Cell type')
@@ -43,6 +42,7 @@ parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
 parser.add_argument('--max_epochs', type=int, default=200, help='Max number of epochs')
 parser.add_argument('--patience', type=int, default=30, help='Patience')
 parser.add_argument('--min_delta', type=float, default=1e-5, help='Min delta')
+parser.add_argument('--sweep', action=argparse.BooleanOptionalAction, help='Sweep')
 
 args = parser.parse_args()
 dataset_name = args.dataset
