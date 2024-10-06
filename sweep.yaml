@@ -4,6 +4,10 @@ project: "koopman"
 metric:
     goal: minimize
     name: val_loss
+command:
+  - ${interpreter}
+  - ${program}
+  - ${args_no_boolean_flags}
 
     
 parameters:
