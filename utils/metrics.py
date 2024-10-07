@@ -11,6 +11,7 @@ from einops import rearrange
 
 # Configure Matplotlib to use LaTeX for text rendering
 plt.rcParams['text.usetex'] = True
+plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['Computer Modern Roman']
 
@@ -76,7 +77,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
         ax.plot(sig, c='yellow', label=r"$s^{(i)}(t)$", zorder=1, linewidth=2)
         
         # Plot the ground truth
-        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\tau(t)$", zorder=1, linewidth=2)
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\texttt{t}(t)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
         im = ax.imshow(derivative.reshape(1,-1), 
@@ -92,7 +93,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$w_\tau^{(i)}(t)$')
+        cbar.set_label(r'$w_\texttt{t}^{(i)}(t)$')
 
         # Add labels and legend
         ax.set_xlabel(r'Time $t$')
@@ -187,7 +188,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
         ax.plot(signal, c='yellow', label=r"$s^{(i)}(t)$", zorder=1, linewidth=2)
         
         # Plot the ground truth
-        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\tau(t)$", zorder=1, linewidth=2)
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\texttt{t}(t)$", zorder=1, linewidth=2)
 
         # Create a color scale using the derivative
         im = ax.imshow(derivative.reshape(1,-1), 
@@ -203,7 +204,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
 
         # Add a colorbar
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(r'$w_\tau^{(i)}(t)$')
+        cbar.set_label(r'$w_\texttt{t}^{(i)}(t)$')
 
         # Add labels and legend
         ax.set_xlabel(r'Time $t$')
@@ -387,14 +388,14 @@ def mann_whitney_test(signal, ground_truth, window_size=5, plot=False):
 
         sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
                      kde=True,
-                     label=r"$f_{gt}(t)$",
+                     label=r"$f_\text{gt}(t)$",
                      color='skyblue', edgecolor='black', ax=axs)
         sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
                      kde=True,
-                     label=r"$f_{r}(t)$",
+                     label=r"$f_\text{r}(t)$",
                      color='salmon', edgecolor='black', ax=axs)
         
-        axs.set_xlabel(r"$w_\tau^{(i)}$", fontsize=14)
+        axs.set_xlabel(r"$w_\texttt{t}^{(i)}$", fontsize=14)
         axs.set_ylabel('', fontsize=14)
 
         axs.legend()
@@ -478,14 +479,14 @@ def mann_whitney_test_dataset(signal, ground_truth, window_size=5, plot=False):
 
         sns.histplot(data_gt, x=r"$f_{gt}(t)$", bins=20, alpha=0.7,
                      kde=True,
-                     label=r"$f_{gt}(t)$",
+                     label=r"$f_\text{gt}(t)$",
                      color='skyblue', edgecolor='black', ax=axs)
         sns.histplot(data_r, x=r"$f_{r}(t)$", bins=20, alpha=0.7,
                      kde=True,
-                     label=r"$f_{r}(t)$",
+                     label=r"$f_\text{r}(t)$",
                      color='salmon', edgecolor='black', ax=axs)
         
-        axs.set_xlabel(r"$w_\tau^{(i)}$", fontsize=14)
+        axs.set_xlabel(r"$w_\texttt{t}^{(i)}$", fontsize=14)
         axs.set_ylabel('', fontsize=14)
 
         axs.legend()
@@ -553,7 +554,7 @@ def auc_analysis_edges(weights, edge_index, edge_gt, num_nodes, plot=False):
                                      width=2)
         
         cbar = plt.colorbar(pax, ax=axs, aspect=40)
-        cbar.set_label(r'$w_e(n,m)$')
+        cbar.set_label(r'$w_\texttt{e}(n,m)$')
 
         # Create an inset axis within the first axis
         inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
@@ -627,7 +628,7 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
                                edge_color='lightblue', width=2)
 
         cbar = plt.colorbar(pax, ax=axs, aspect=40)
-        cbar.set_label(r'$w_s^{(i)}(n)$')    
+        cbar.set_label(r'$w_\texttt{s}^{(i)}(n)$')    
         
         # Create an inset axis for ground truth
         inset_ax = fig.add_axes([0, 0, 0.25, 0.3])  # [left, bottom, width, height]
