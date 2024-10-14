@@ -11,7 +11,7 @@ from einops import rearrange
 
 # Configure Matplotlib to use LaTeX for text rendering
 plt.rcParams['text.usetex'] = True
-plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
+plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amssymb}'
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['Computer Modern Roman']
 

@@ -89,4 +89,4 @@ class DMD:
         m = V[:, mode_idx].real
         weights = np.dot(self.Zp, m)
 
-        return weights[:,-1]
+        return weights

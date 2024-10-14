@@ -272,10 +272,11 @@ for g in tqdm(range(len(edges_gt)), desc='Whole dataset', leave=False):
     plt.close('all')
 
     # Spatial explanation via DMD
-    weights = get_weights_from_DMD(node_states[g], 
+    weights_t = get_weights_from_DMD(node_states[g], 
                                    config['dim_red'],
                                    mode_idx=mode_idx,
                                    method=config['emb_method'])
+    weights = weights_t[:,-1] # last time step
     weights = weights - weights.mean()
     fig, auc = auc_analysis_nodes(np.abs(weights), nodes_gt[g][-1], edge_indexes[g], plot=config['plot'])
     aucs_nodes.append(auc)
