@@ -11,7 +11,6 @@ import json
 import argparse
 
 from sklearn.model_selection import train_test_split
-from typing import Optional
 from dataset.utils import (load_classification_dataset,
                             process_classification_dataset,
                             ground_truth)
