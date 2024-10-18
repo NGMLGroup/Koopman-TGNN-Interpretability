@@ -2,16 +2,18 @@
 <!--- ({Venue} {Year})
 
 [![ICLR](https://img.shields.io/badge/{Venue}-{Year}-blue.svg?)]({Link to paper page})
-
+[![paper](https://custom-icon-badges.demolab.com/badge/paper-pdf-green.svg?logo=file-text&logoSource=feather&logoColor=white)]({Link to paper page})
 -->
-[![paper](https://custom-icon-badges.demolab.com/badge/paper-pdf-green.svg?logo=file-text&logoSource=feather&logoColor=white)](https://arxiv.org/pdf/2410.13469)
 
 <!---
 [![poster](https://custom-icon-badges.demolab.com/badge/poster-pdf-orange.svg?logo=note&logoSource=feather&logoColor=white)]({Link to the poster/presentation})
 [![arXiv](https://img.shields.io/badge/arXiv-{Arxiv.ID}-b31b1b.svg?)]({Link to Arixv})
 -->
+[![arXiv](https://img.shields.io/badge/arXiv-{Arxiv.ID}-b31b1b.svg?)](https://arxiv.org/pdf/2410.13469)
 
-This repository contains the code for the reproducibility of the experiments presented in the paper "Interpreting Temporal Graph Neural Networks with Koopman Theory" ({Venue} {Year}). 
+
+This repository contains the code for the reproducibility of the experiments presented in the paper "Interpreting Temporal Graph Neural Networks with Koopman Theory" (2024).
+<!--({Venue} {Year}). --> 
 We present a novel approach to interpret temporal graph models using Koopman theory, combining DMD and SINDy to uncover key spatial and temporal patterns.
 
 **Authors**: [Michele Guerra](mailto:michele.guerra@uit.no), [Simone Scardapane](mailto:simone.scardapane@uniroma1.it), [Filippo Maria Bianchi](mailto:filippo.m.bianchi@uit.no)
