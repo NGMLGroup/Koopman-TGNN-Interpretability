@@ -1,8 +1,10 @@
 # Interpreting Temporal Graph Neural Networks with Koopman Theory (2024) 
-<!--- ({Venue} {Year}) -->
+<!--- ({Venue} {Year})
 
 [![ICLR](https://img.shields.io/badge/{Venue}-{Year}-blue.svg?)]({Link to paper page})
-[![paper](https://custom-icon-badges.demolab.com/badge/paper-pdf-green.svg?logo=file-text&logoSource=feather&logoColor=white)]({Link to the paper})
+
+-->
+[![paper](https://custom-icon-badges.demolab.com/badge/paper-pdf-green.svg?logo=file-text&logoSource=feather&logoColor=white)](https://arxiv.org/pdf/2410.13469)
 
 <!---
 [![poster](https://custom-icon-badges.demolab.com/badge/poster-pdf-orange.svg?logo=note&logoSource=feather&logoColor=white)]({Link to the poster/presentation})
@@ -51,11 +53,8 @@ The directory is structured as follows:
 
 ## Datasets
 
-All datasets are automatically downloaded and stored in the folder `datasets`.
-
-The datasets used in the experiment are provided by [pyg](). Dataset-1 and Dataset-2 datasets are downloaded from these links:
-- [Dataset-1]().
-- [Dataset-2]().
+All datasets are stored in the folder `dataset`.
+Each dataset comes with a README file that provides sources and a description.
 
 
 ## Configuration files
@@ -93,10 +92,27 @@ The scripts used for the experiments in the paper are in the main folder.
 	```
 
 
+## Third-Party licenses
+
+This project incorporates code from other open-source projects, all under the MIT License. For more details, see the `licenses/` directory for full license texts.
+
+- [Torch Spatiotemporal](https://github.com/TorchSpatiotemporal/tsl): File `models/DynGraphConvRNN.py` is a modification of code from the cited library, to allow time-varying topology.
+- [SindyAutoencoders](https://github.com/kpchamp/SindyAutoencoders): Some part of file `koopman\sindy.py` are taken from the cited library.
+- [KANN](https://github.com/azencot-group/KANN): File `koopman\dmd.py` is partly based on the cited library.
+
+
 ## Bibtex reference
 
-If you find this code useful please consider to cite our paper:
+If you find this code useful please consider citing our paper:
 
 ```
-{Bibtex reference}
+@misc{guerra2024interpretingtemporalgraphneural,
+      title={Interpreting Temporal Graph Neural Networks with Koopman Theory}, 
+      author={Michele Guerra and Simone Scardapane and Filippo Maria Bianchi},
+      year={2024},
+      eprint={2410.13469},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2410.13469}, 
+}
 ```
