@@ -9,7 +9,7 @@
 [![poster](https://custom-icon-badges.demolab.com/badge/poster-pdf-orange.svg?logo=note&logoSource=feather&logoColor=white)]({Link to the poster/presentation})
 [![arXiv](https://img.shields.io/badge/arXiv-{Arxiv.ID}-b31b1b.svg?)]({Link to Arixv})
 -->
-[![arXiv](https://img.shields.io/badge/arXiv-{Arxiv.ID}-b31b1b.svg?)](https://arxiv.org/pdf/2410.13469)
+[![arXiv](https://img.shields.io/badge/arXiv-2410.13469-b31b1b.svg?)](https://arxiv.org/pdf/2410.13469)
 
 
 This repository contains the code for the reproducibility of the experiments presented in the paper "Interpreting Temporal Graph Neural Networks with Koopman Theory" (2024).
