@@ -27,9 +27,9 @@ Inspired by Koopman theory, which allows a simpler description of intricate, non
 The first relies on dynamic mode decomposition (DMD), a Koopman-inspired dimensionality reduction method. The second relies on sparse identification of nonlinear dynamics (SINDy), a popular method for discovering governing equations, which we use for the first time as a general tool for explainability. 
 We show how our methods can correctly identify interpretable features such as infection times and infected nodes in the context of dissemination processes.
 
-<p align=center>
+<!--p align=center>
 	<img src="./images/koopman.gif" alt="Example of spatiotemporal explanation."/>
-</p>
+</p-->
 
 ---
 
