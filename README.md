@@ -16,7 +16,7 @@ This repository contains the code for the reproducibility of the experiments pre
 <!--({Venue} {Year}). --> 
 We present a novel approach to interpret temporal graph models using Koopman theory, combining DMD and SINDy to uncover key spatial and temporal patterns.
 
-**Authors**: [Michele Guerra](mailto:michele.guerra@uit.no), [Simone Scardapane](mailto:simone.scardapane@uniroma1.it), [Filippo Maria Bianchi](mailto:filippo.m.bianchi@uit.no)
+**Authors**: [Michele Guerra](https://en.uit.no/ansatte/person?p_document_id=767125&p_dimension_id=88140), [Simone Scardapane](https://www.sscardapane.it/), [Filippo Maria Bianchi](https://sites.google.com/view/filippombianchi/home)
 
 ---
 
@@ -108,7 +108,7 @@ This project incorporates code from other open-source projects, all under the MI
 
 If you find this code useful please consider citing our paper:
 
-```
+```bibtex
 @misc{guerra2024interpretingtemporalgraphneural,
       title={Interpreting Temporal Graph Neural Networks with Koopman Theory}, 
       author={Michele Guerra and Simone Scardapane and Filippo Maria Bianchi},
