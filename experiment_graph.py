@@ -11,7 +11,6 @@ import json
 import argparse
 
 from sklearn.model_selection import train_test_split
-from typing import Optional
 from dataset.utils import (load_classification_dataset,
                             process_classification_dataset,
                             ground_truth)
@@ -152,9 +151,9 @@ sal_attr = run_saliency(edge_indexes, node_labels, graph_labels,
                         config, device, verbose=False)
 
 # Compute the PCA weights as baseline
-v = np.eye(v.shape[0])
-pca_modes = change_basis(states.inputs, v, emb_engine)
-val_pca_modes = change_basis(val_X, v, emb_engine)
+v_id = np.eye(v.shape[0])
+pca_modes = change_basis(states.inputs, v_id, emb_engine)
+val_pca_modes = change_basis(val_X, v_id, emb_engine)
 
 gs = []
 r_thr_prec, r_thr_rec, r_thr_f1, r_thr_base = [], [], [], []
@@ -163,7 +162,7 @@ r_win_prec, r_win_rec, r_win_f1, r_win_base = [], [], [], []
 r_sal_prec, r_sal_rec, r_sal_f1 = [], [], []
 r_thr_pca_base, r_win_pca_base = [], []
 r_mann = []
-aucs_nodes = []
+aucs_nodes, aucs_nodes_sal_val, aucs_nodes_pca_val = [], [], []
 
 for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
 
@@ -189,7 +188,7 @@ for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
     
     # Baseline with PCA modes
     _, _, _, thr_pca_base, _ = \
-        threshold_based_detection(val_pca_modes[g,:,mode_idx], val_times_gt[g], 
+        threshold_based_detection(val_pca_modes[g,:,0], val_times_gt[g], # first PC
                                 threshold=config['threshold'],
                                 window_size=config['window_size'],
                                 plot=False)
@@ -204,7 +203,7 @@ for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
 
     # Baseline with PCA modes
     _, _, _, win_pca_base, _ = \
-        windowing_analysis(val_pca_modes[g,:,mode_idx], val_times_gt[g],
+        windowing_analysis(val_pca_modes[g,:,0], val_times_gt[g], # first PC
                             window_size=config['window_size'],
                             threshold=config['threshold'],
                             plot=False)
@@ -223,12 +222,25 @@ for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/time_gt/{g}_mw_{mode_idx}.pdf", bbox_inches='tight')
 
+    # Spatial explanation on nodes via DMD on modes from trianing dataset
     node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v, emb_engine)
     weights = node_modes[:,-1,mode_idx] - node_modes[:,-1,mode_idx].mean()
     fig, auc = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
                                   val_edge_indexes[g], plot=config['plot'])
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/node_gt/global_dmd/{g}_mask_{mode_idx}.pdf", bbox_inches='tight')
+    
+    # Spatial explanation on nodes via saliency
+    weights_t = sal_attr[val_idx[g]].T.cpu().numpy() # shape [nodes, times]
+    weights = np.max(np.abs(weights_t), axis=1) # max over time
+    _, auc_sal = auc_analysis_nodes(weights, val_nodes_gt[g][-1], 
+                                  val_edge_indexes[g], plot=False)
+
+    # Spatial explanation on nodes via PCA only
+    node_modes = change_basis(rearrange(val_nodes[g], 't n f -> n t f'), v_id, emb_engine)
+    weights = node_modes[:,-1,0] - node_modes[:,-1,0].mean() # first PC
+    _, auc_pca = auc_analysis_nodes(np.abs(weights), val_nodes_gt[g][-1], 
+                                  val_edge_indexes[g], plot=False)
     
     plt.close('all')
     
@@ -251,6 +263,8 @@ for g in tqdm(range(len(val_modes)), desc='Validation dataset', leave=False):
     r_sal_f1.append(sal_f1)
     r_mann.append(mw_p_value)
     aucs_nodes.append(auc)
+    aucs_nodes_sal_val.append(auc_sal)
+    aucs_nodes_pca_val.append(auc_pca)
 
 # Mann-Whitney U test on whole dataset
 fig, mw_p_value_dt = mann_whitney_test_dataset(val_modes[val_y==1,:,mode_idx], 
@@ -283,7 +297,9 @@ results = pd.DataFrame({
     'saliency_f1_score': r_sal_f1,
     'mw_p_value': r_mann,
     'mw_p_value_dt': mw_p_value_dt,
-    'auc_nodes': aucs_nodes
+    'auc_nodes': aucs_nodes,
+    'auc_nodes_sal_val': aucs_nodes_sal_val,
+    'auc_nodes_pca_val': aucs_nodes_pca_val
 })
 
 # Log on wandb the averages
@@ -336,7 +352,7 @@ for g in tqdm(range(len(edges_gt)), desc='Whole dataset', leave=False):
     
     plt.close('all')
 
-    # Spatial explanation via DMD on nodes
+    # Spatial explanation on nodes via DMD on graph modes
     weights_t = get_weights_from_DMD(node_states[g], 
                                    config['dim_red'],
                                    mode_idx=mode_idx,
@@ -349,13 +365,13 @@ for g in tqdm(range(len(edges_gt)), desc='Whole dataset', leave=False):
     if fig is not None:
         fig.savefig(f"plots/{config['dataset']}/node_gt/local_dmd/{g}_mask.pdf", bbox_inches='tight')
 
-    # Spatial explanation baseline via saliency
+    # Spatial explanation on nodes baseline via saliency
     weights_t = sal_attr[g].T.cpu().numpy() # shape [nodes, times]
     weights = np.max(np.abs(weights_t), axis=1) # max over time
     _, auc = auc_analysis_nodes(weights, nodes_gt[g][-1], edge_indexes[g], plot=config['plot'])
     aucs_nodes_sal_base.append(auc)
 
-    # Spatial explanation baseline via PCA only
+    # Spatial explanation on nodes baseline via PCA only
     weights_t = get_weights_from_PCA(node_states[g], config['dim_red'], method=config['emb_method'])
     weights = weights_t[:,-1,0] # last time step, first PC
     weights = weights - weights.mean()
