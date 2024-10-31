@@ -16,6 +16,28 @@ plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['Computer Modern Roman']
 
 
+def F1_score(detected, ground_truth):
+    """
+    Calculate the F1 score between two binary signals.
+    """
+
+    true_positives = np.intersect1d(detected, ground_truth)
+    false_positives = np.setdiff1d(detected, ground_truth)
+    false_negatives = np.setdiff1d(ground_truth, detected)
+
+    precision_denominator = len(true_positives) + len(false_positives)
+    recall_denominator = len(true_positives) + len(false_negatives)
+
+    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
+    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
+
+    # Calculate F1 score with a check to avoid division by zero
+    f1_score_denominator = precision + recall
+    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+
+    return f1_score, precision, recall
+
+
 def threshold_based_detection(signal, ground_truth, threshold=None, window_size=5, plot=False):
     """
     Define a threshold that captures significant changes in the derivative.
@@ -39,6 +61,10 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     
     if threshold is None:
         threshold = np.mean(derivative) + np.std(derivative)
+    elif threshold is 'mad':
+        median = np.median(derivative)
+        mad = np.median(np.abs(derivative - median))
+        threshold = median + 3 * mad
     else:
         threshold = threshold * np.max(derivative)
 
@@ -49,19 +75,7 @@ def threshold_based_detection(signal, ground_truth, threshold=None, window_size=
     derivative = derivative[window_size//2:-window_size//2+1]
     detected = np.where(derivative > threshold)[0]
 
-    true_positives = np.intersect1d(detected, ground_truth_i)
-    false_positives = np.setdiff1d(detected, ground_truth_i)
-    false_negatives = np.setdiff1d(ground_truth_i, detected)
-
-    precision_denominator = len(true_positives) + len(false_positives)
-    recall_denominator = len(true_positives) + len(false_negatives)
-
-    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
-    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
-
-    # Calculate F1 score with a check to avoid division by zero
-    f1_score_denominator = precision + recall
-    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+    f1_score, precision, recall = F1_score(detected, ground_truth_i)
 
     # Baseline F1 score
     baseline_f1 = F1_baseline(ground_truth_i)
@@ -161,19 +175,7 @@ def windowing_analysis(signal, ground_truth, window_size=5, threshold=None, plot
     ground_truth_c = np.convolve(ground_truth, filter, mode='valid')
     ground_truth_i = np.where(ground_truth_c > 0)[0]
 
-    true_positives = np.intersect1d(detected, ground_truth_i)
-    false_positives = np.setdiff1d(detected, ground_truth_i)
-    false_negatives = np.setdiff1d(ground_truth_i, detected)
-
-    precision_denominator = len(true_positives) + len(false_positives)
-    recall_denominator = len(true_positives) + len(false_negatives)
-
-    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
-    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
-
-    # Calculate F1 score with a check to avoid division by zero
-    f1_score_denominator = precision + recall
-    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+    f1_score, precision, recall = F1_score(detected, ground_truth_i)
 
     # Baseline F1 score
     baseline_f1 = F1_baseline(ground_truth_i)
@@ -248,21 +250,74 @@ def F1_baseline(ground_truth):
     """
 
     detected = np.ones_like(ground_truth)
-    true_positives = np.intersect1d(detected, ground_truth)
-    false_positives = np.setdiff1d(detected, ground_truth)
-    false_negatives = np.setdiff1d(ground_truth, detected)
-
-    precision_denominator = len(true_positives) + len(false_positives)
-    recall_denominator = len(true_positives) + len(false_negatives)
-
-    precision = len(true_positives) / precision_denominator if precision_denominator > 0 else 0
-    recall = len(true_positives) / recall_denominator if recall_denominator > 0 else 0
-
-    # Calculate F1 score with a check to avoid division by zero
-    f1_score_denominator = precision + recall
-    f1_score = 2 * (precision * recall) / f1_score_denominator if f1_score_denominator > 0 else 0
+    
+    f1_score, _, _ = F1_score(detected, ground_truth)
 
     return f1_score
+
+
+def F1_baseline_saliency(saliency_attr, ground_truth, window_size=5, k=3, plot=False):
+    """
+    Calculate the F1 score from the saliency attributes.
+    """
+
+    median = np.median(saliency_attr)
+    mad = np.median(np.abs(saliency_attr - median))
+    threshold = median + k * mad
+    saliency_attr = saliency_attr[window_size//2:-window_size//2+1]
+    detected = np.where(saliency_attr > threshold)[0]
+    
+    filter = np.ones(window_size)
+    ground_truth_c = np.convolve(ground_truth, filter, mode='valid')
+    ground_truth_i = np.where(ground_truth_c > 0)[0]
+    
+    f1_score, precision, recall = F1_score(detected, ground_truth_i)
+
+    if plot:
+
+        # Plot the signal
+        fig, ax = plt.subplots(figsize=(8, 2))
+        ax2 = ax.twinx()
+        
+        # Plot the trajectory of the signal
+        sig = saliency_attr
+        ax.plot(sig, c='blue', label=r"$s^{(i)}(t)$", zorder=1, linewidth=2)
+        
+        # Plot the ground truth
+        ax2.plot(ground_truth_c, c='orangered', label=r"$m_\texttt{t}(t)$", zorder=1, linewidth=2)
+
+        # Add detected points
+        det = np.zeros_like(ground_truth_c)
+        det[detected] = 1
+        ax.plot(np.where(det, sig, np.nan),
+                '*', markerfacecolor='yellow', markeredgecolor='deeppink', markersize=10,
+                label='Detected')
+
+        # Add labels and legend
+        ax.set_xlabel(r'Time $t$')
+
+        # Combine handles and labels from both axes
+        handles, labels = ax.get_legend_handles_labels()
+        handles2, labels2 = ax2.get_legend_handles_labels()
+        handles2 += handles
+        labels2 += labels
+
+        # Add a single legend
+        ax2.legend(handles2, labels2, loc='upper left')
+
+        # Hide the secondary y-axis
+        ax2.yaxis.set_visible(False)
+
+        # Remove grid lines
+        ax.grid(False)
+        ax2.grid(False)
+
+        # Adjust layout
+        plt.tight_layout()
+
+        return fig, precision, recall, f1_score
+
+    return None, precision, recall, f1_score
     
 
 def cross_correlation(signal, ground_truth, plot=False):

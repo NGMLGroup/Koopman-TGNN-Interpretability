@@ -95,3 +95,86 @@ def get_weights_from_DMD(node_state, dim_red, mode_idx=0, method='PCA'):
     dmd = DMD(node_state, k=dim_red, emb=method)
 
     return dmd.compute_weights(mode_idx)
+
+
+def get_weights_from_PCA(node_state, dim_red, method='PCA'):
+    from koopman.dmd import DMD
+
+    # Compute Koopman operator with DMD
+    node_state = rearrange(node_state, 't n f -> n t f')
+    dmd = DMD(node_state, k=dim_red, emb=method)
+
+    return dmd.Zp
+
+
+def run_saliency(edge_indexes, node_labels, graph_labels, config, device, verbose=False):
+
+    from models.DynGraphConvRNN import DynGraphModel
+    from dataset.utils import DynGraphDataset
+    from captum.attr import Saliency
+    from tqdm import tqdm
+    import os
+   
+    if config['testing'] == True:
+        edge_indexes = edge_indexes[:50]
+        node_labels = node_labels[:50]
+        graph_labels = graph_labels[:50]
+
+    dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
+
+    # Define the model
+    input_size = 1
+
+    # Remove the unnecessary return values from the forward method
+    class RedDynGraphModel(DynGraphModel):
+        def forward(self, x, edge_index):
+            # Call the forward method of the parent class
+            x, _, _, _ = super().forward(x, edge_index, edge_weight=None)
+            
+            # return only x
+            return x
+        
+    model = RedDynGraphModel(input_size=input_size,
+                            hidden_size=config['hidden_size'],
+                            rnn_layers=config['rnn_layers'],
+                            readout_layers=config['readout_layers'],
+                            cell_type=config['cell_type'],
+                            cat_states_layers=config['cat_states_layers']).to(device)
+    
+    # Load the model from the file
+    model_filepath = f'models/saved/dynConvRNN_{config["dataset"]}.pt'
+    if not os.path.exists(model_filepath):
+        raise FileNotFoundError(f"Model file '{model_filepath}' not found. Train the model first.")
+    model.load_state_dict(torch.load(model_filepath))
+    model = model.to(device)
+    model.eval()
+
+    # Define saliency object
+    saliency = Saliency(model)
+
+    attributes = []
+    labels = []
+
+    if verbose:
+        print("Running saliency on model...")
+
+    for data in tqdm(dataset):
+        input, label = data
+
+        # Move the inputs and labels to the device
+        input = input.to(device)
+        label = label.to(device)
+
+        # Compute saliency with respect to input.input.x
+        input.input.x.requires_grad = True  
+        attribute = saliency.attribute(inputs=input.input.x.unsqueeze(0), target=None, 
+                                        additional_forward_args=input.edge_index)
+        attributes.append(attribute.squeeze().detach().cpu())
+        labels.append(label)
+   
+
+    if verbose:
+        print("Saliency run complete.")
+    
+    # List of attributes of shape [T, num_nodes]
+    return attributes
