@@ -3,6 +3,7 @@ dataset/MUTAG
 dataset/NCI1
 dataset/pv*
 dataset/spain*
+dataset/fit3d*
 lightning_logs
 logs
 HAVOK
@@ -20,6 +21,7 @@ plots/
 results*
 *png
 .vscode
+media
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
