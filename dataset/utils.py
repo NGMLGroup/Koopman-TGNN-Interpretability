@@ -3,15 +3,20 @@ import tsl
 import h5py
 import os
 
-from models.DynGraphConvRNN import DynGraphModel
+import numpy as np
+
+from tsl.datasets import PvUS
+from models.DynGraphESN import DynGESNModel
+from models.models import DynGraphModel
 from tqdm import tqdm
+from einops import rearrange
 from numpy import loadtxt, ndarray
 from torch_geometric.utils import add_self_loops
 from torch.utils.data import Dataset
 
 
 
-class H5Dataset(torch.utils.data.Dataset):
+class H5Dataset(Dataset):
     def __init__(self, file_path, input_key, target_key):
         self.file_path = file_path
         self.input_key = input_key
@@ -30,7 +35,6 @@ class H5Dataset(torch.utils.data.Dataset):
             target_data = torch.from_numpy(self.targets[index])
         else:
             target_data = torch.tensor(self.targets[index])
-        sample = {'x': input_data, 'y': target_data}
         return input_data, target_data
     
 
@@ -48,9 +52,137 @@ class DynGraphDataset(Dataset):
                                   target={'y': self.graph_labels[idx]},
                                   edge_index=self.edge_indexes[idx]),
                 self.graph_labels[idx])
+    
+
+def run_dyn_gesn_PV(file_path, threshold, config, device, zones=['west'], freq='H', verbose=False):
+    """
+    Runs the DynGESN model on the PVUS dataset and saves the results to an H5 file.
+
+    Args:
+        file_path (str): The path to the H5 file where the results will be saved.
+        threshold (float): The threshold value for connectivity.
+        config (dict): The configuration parameters for the DynGESN model.
+        device (str): The device to run the model on.
+        zones (list, optional): The list of zones to consider. Defaults to ['west'].
+        freq (str, optional): The frequency of the data. Defaults to 'H'.
+        verbose (bool, optional): Whether to print progress messages. Defaults to False.
+    """
+
+    dataset = PvUS(root="dataset/pv_us", zones=zones, freq=freq)
+    node_index = [i for i in range(0, 200)]
+    dataset = dataset.reduce(node_index=node_index)
+    sim = dataset.get_similarity("distance")
+    connectivity = dataset.get_connectivity(threshold=threshold,
+                                            include_self=False,
+                                            normalize_axis=1,
+                                            layout="edge_index")
+
+    horizon = 24
+    torch_dataset = tsl.data.SpatioTemporalDataset(target=dataset.dataframe(),
+                                                    connectivity=connectivity,
+                                                    mask=dataset.mask,
+                                                    horizon=horizon,
+                                                    window=1,
+                                                    stride=1)
+
+    sample = torch_dataset[0].to(device)
+
+    _, _, feat_size = sample.input.x.shape
+
+    model = DynGESNModel(input_size=feat_size,
+                        reservoir_size=config['reservoir_size'],
+                        input_scaling=config['input_scaling'],
+                        reservoir_layers=config['reservoir_layers'],
+                        leaking_rate=config['leaking_rate'],
+                        spectral_radius=config['spectral_radius'],
+                        density=config['density'],
+                        reservoir_activation=config['reservoir_activation'],
+                        alpha_decay=config['alpha_decay']).to(device)
+    
+    
+    # Save the model to a file
+    model_file_path = "models/saved/DynGESN.pt"
+    torch.save(model.state_dict(), model_file_path)
+    if verbose:
+        print(f"Model saved to {model_file_path}")
+
+    inputs = []
+    labels = []
+
+    if verbose:
+        print("Running DynGESN model...")
+
+    for i, sample in enumerate(tqdm(torch_dataset)):
+        sample = sample.to(device)
+        output = model(sample.input.x, sample.input.edge_index, sample.input.edge_weight)[:,:,-1,:]
+        inputs.append(output.detach().cpu())
+        labels.append(sample.target.y.detach().cpu())
+
+    if verbose:
+        print("DynGESN model run complete.")
+
+    # Save the torch_dataset to the H5 file
+    if verbose:
+        print("Saving results to H5 file...")
+
+    inputs = torch.stack(inputs, dim=0).squeeze()
+    inputs = rearrange(inputs, 'b n f -> b n f')
+    labels = torch.stack(labels, dim=0)[:, -1, :, :]
+
+    with h5py.File(file_path, "w") as h5_file:
+        h5_file.create_dataset("input", data=inputs)
+        h5_file.create_dataset("label", data=labels)
+    
+    if verbose:
+        print("Saved results to H5 file.")
 
 
-def load_classification_dataset(name, b_add_self_loops=True):
+def process_PVUS(config, device, threshold=0.7, train_ratio=0.7, test_ratio=0.2, batch_size=32, ignore_file=True, zones=['west'], freq='H', verbose=False):
+    """
+    Process the PVUS dataset and return dataloaders for training, testing and validation subsets.
+
+    Args:
+        config (dict): The configuration parameters for the DynGESN model.
+        device (str): The device to run the model on.
+        threshold (float): The threshold value for connectivity.
+        train_ratio (float, optional): The ratio of samples to be used for training. Defaults to 0.7.
+        test_ratio (float, optional): The ratio of samples to be used for testing. Defaults to 0.2.
+        batch_size (int, optional): The batch size for the dataloaders. Defaults to 32.
+        ignore_file (bool, optional): Whether to ignore the file if it already exists. Defaults to True.
+        zones (list, optional): The zones to be processed. Defaults to ['west'].
+        freq (str, optional): The frequency of the data. Defaults to 'H'.
+        verbose (bool, optional): Whether to print progress messages. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the train dataloader, test dataloader and validation dataloader.
+    """
+
+    # Specify the path to the H5 file
+    file_path = "dataset/pv_us/processed/" + zones[0] + "_" + freq + ".h5"
+
+    if not os.path.exists(file_path) or ignore_file:
+        run_dyn_gesn_PV(file_path, threshold, config, device, zones, freq, verbose=verbose)
+    
+    dataset = H5Dataset(file_path, "input", "label")
+    
+    # Calculate the number of samples for each split
+    num_samples = len(dataset)
+    train_size = int(train_ratio * num_samples)
+    test_size = int(test_ratio * num_samples)
+
+    # Define the dataloaders for each subset
+    train_dataset = torch.utils.data.Subset(dataset, list(range(train_size)))
+    val_dataset = torch.utils.data.Subset(dataset, list(range(train_size, num_samples-test_size)))
+    test_dataset = torch.utils.data.Subset(dataset, list(range(num_samples-test_size, num_samples)))
+    
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_dataloader, test_dataloader, val_dataloader
+
+
+def load_binary_dataset(name, b_add_self_loops=True):
     # Specify the folder path
     folder_path = f"dataset/{name}/"
 
@@ -140,10 +272,68 @@ def load_classification_dataset(name, b_add_self_loops=True):
     return edge_indexes, node_labels, graph_labels
 
 
-def run_dyn_crnn_classification(file_path, config, device, verbose=False):
-    # Load dataset
-    edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'], config['add_self_loops'])
+def load_skeleton_dataset():
+    import json
+    from sklearn.preprocessing import OneHotEncoder
+    from torch_geometric.utils import to_undirected
+
+    dataset_name = 'fit3d'
+    data_root = 'dataset'
+    subset = 'train'
+
+    # subject names
+    subj_names = ['s03', 's04', 's05', 's07', 's08', 's09', 's10', 's11']
+    # action names
+    action_names = ['band_pull_apart', 'barbell_dead_row', 'barbell_row', 
+                    'deadlift', 'diamond_pushup', 'dumbbell_biceps_curls', 
+                    'dumbbell_hammer_curls', 'dumbbell_high_pulls', 'dumbbell_overhead_shoulder_press', 
+                    'dumbbell_reverse_lunge', 'dumbbell_scaptions', 'mule_kick', 
+                    'neutral_overhead_shoulder_press', 'one_arm_row', 'overhead_trap_raises', 
+                    'pushup', 'barbell_shrug', 'side_lateral_raise', 'squat', 'w_raise', 
+                    'warmup_4', 'warmup_7', 'warmup_17', 'burpees', 'clean_and_press', 
+                    'drag_curl', 'dumbbell_curl_trifecta', 'man_maker', 'overhead_extension_thruster', 
+                    'standing_ab_twists', 'warmup_2', 'warmup_3', 'warmup_9', 'warmup_10', 
+                    'warmup_13', 'warmup_18', 'warmup_19']
     
+    # adjacency matrix fixed, determined by the skeleton structure
+    edge_index = [[10, 9], [9, 8], [8, 11], [8, 14], [11, 12], [14, 15], [12, 13], [15, 16],
+        [8, 7], [7, 0], [0, 1], [0, 4], [1, 2], [4, 5], [2, 3], [5, 6],
+        [13, 21], [13, 22], [16, 23], [16, 24], [3, 17], [3, 18], [6, 19], [6, 20]]
+    edge_index = torch.tensor(edge_index).T
+    # Add self-loops to edge_index
+    edge_index, _ = add_self_loops(edge_index, num_nodes=25)
+    # Make edge_index undirected
+    edge_index = to_undirected(edge_index, num_nodes=25)
+
+    node_labels = []
+    graph_labels = []
+    
+    # One-hot encoder for action names
+    encoder = OneHotEncoder()
+    action_names_encoded = encoder.fit_transform(np.array(action_names).reshape(-1, 1)).toarray()
+    
+    for subj_name in subj_names:
+        for action_name in action_names:
+            action_index = action_names.index(action_name)
+            graph_labels.append(action_names_encoded[action_index])
+            j3d_path = '%s/%s/%s/%s/joints3d_25/%s.json' % (data_root, dataset_name, subset, subj_name, action_name)
+            with open(j3d_path) as f:
+                node_labels.append(np.array(json.load(f)['joints3d_25']))
+    
+    # Find the maximum T
+    max_T = max(node_label.shape[0] for node_label in node_labels)
+    # Pad each node_label to have the same T
+    node_labels = [np.pad(node_label, ((0, max_T - node_label.shape[0]), (0, 0), (0, 0)), mode='constant') for node_label in node_labels]
+
+    node_labels = np.stack(node_labels, axis=0, dtype=np.float32)
+    graph_labels = np.stack(graph_labels, axis=0, dtype=np.float32)
+    edge_index = edge_index.repeat(node_labels.shape[0], 1, 1)
+
+    return edge_index, torch.from_numpy(node_labels), torch.from_numpy(graph_labels)
+
+
+def run_model_classification(edge_indexes, node_labels, graph_labels, file_path, config, model_name, device, verbose=False):
+   
     if config['testing'] == True:
         edge_indexes = edge_indexes[:50]
         node_labels = node_labels[:50]
@@ -152,19 +342,24 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
 
     # Define the model
-    input_size = 1
+    input_size = node_labels[0].shape[-1]
+    output_size = 1 if graph_labels.ndim==1 else graph_labels[0].shape[0]
     model = DynGraphModel(input_size=input_size,
                             hidden_size=config['hidden_size'],
+                            output_size=output_size,
                             rnn_layers=config['rnn_layers'],
                             readout_layers=config['readout_layers'],
+                            k_kernel=config['k_kernel'],
+                            evolve_variant=config['evolve_variant'] if 'evolve_variant' in config else None,
+                            encoder_type=model_name,
                             cell_type=config['cell_type'],
                             cat_states_layers=config['cat_states_layers']).to(device)
 
     # Load the model from the file
-    model_filepath = f'models/saved/dynConvRNN_{config["dataset"]}.pt'
+    model_filepath = f'models/saved/{model_name}_{config["dataset"]}.pt'
     if not os.path.exists(model_filepath):
         raise FileNotFoundError(f"Model file '{model_filepath}' not found. Train the model first.")
-    model.load_state_dict(torch.load(model_filepath))
+    model.load_state_dict(torch.load(model_filepath, weights_only=True))
     model = model.to(device)
     model.eval()
 
@@ -174,7 +369,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     node_states = []
 
     if verbose:
-        print("Running DynCRNN model...")
+        print(f"Running {model_name} model...")
 
     for data in tqdm(dataset):
         input, label = data
@@ -191,7 +386,7 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
         node_states.append(h.squeeze().detach().cpu())        
 
     if verbose:
-        print("DynCRNN model run complete.")
+        print(f"{model_name} model run complete.")
 
     # Save the torch_dataset to the H5 file
     if verbose:
@@ -205,11 +400,11 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
-    with h5py.File(file_path + "dataset_DynCRNN.h5", "w") as h5_file:
+    with h5py.File(file_path + f"dataset_{model_name}.h5", "w") as h5_file:
         h5_file.create_dataset("input", data=inputs)
         h5_file.create_dataset("label", data=labels)
 
-    with h5py.File(file_path + "states_DynCRNN.h5", "w") as h5_file:
+    with h5py.File(file_path + f"states_{model_name}.h5", "w") as h5_file:
         h5_file.create_dataset("states", data=states)
         h5_file.create_dataset("label", data=labels)
 
@@ -225,31 +420,50 @@ def run_dyn_crnn_classification(file_path, config, device, verbose=False):
     return node_states, node_labels
 
 
-def process_classification_dataset(config, model, device, ignore_file=True, verbose=False):
+def load_classification_dataset(dataset_name):
+    
+    binary_datasets = ['facebook_ct1', 'infectious_ct1', 'dblp_ct1', 'highschool_ct1', 'mit_ct1', 'tumblr_ct1']
+    if dataset_name in binary_datasets:
+        edge_indexes, node_labels, graph_labels = load_binary_dataset(dataset_name, False)
+    elif dataset_name == 'fit3d':
+        edge_indexes, node_labels, graph_labels = load_skeleton_dataset()
+    else:
+        raise ValueError(f"Dataset {dataset_name} not supported.")
+    
+    return edge_indexes, node_labels, graph_labels
+
+
+def process_classification_dataset(config, model_name, device, ignore_file=True, verbose=False):
+    binary_datasets = ['facebook_ct1', 'infectious_ct1', 'dblp_ct1', 'highschool_ct1', 'mit_ct1', 'tumblr_ct1']
+    # Load dataset
+    edge_indexes, node_labels, graph_labels = load_classification_dataset(config['dataset'])
+
     # Specify the path to the H5 file
     file_path = f"dataset/{config['dataset']}/processed/"
 
-    cond = not os.path.exists(file_path + f"dataset_{model}.h5") \
-            or not os.path.exists(file_path + f"states_{model}.h5") \
-            or not os.path.exists(file_path + f"node_states_{model}.h5")
+    cond = not os.path.exists(file_path + f"dataset_{model_name}.h5") \
+            or not os.path.exists(file_path + f"states_{model_name}.h5") \
+            or not os.path.exists(file_path + f"node_states_{model_name}.h5")
             
-    if model=="DynCRNN":
+    if config['dataset'] in binary_datasets:
         if cond or ignore_file:
-            node_states, node_labels = run_dyn_crnn_classification(file_path, config, device, verbose=verbose)
+            node_states, node_labels = run_model_classification(edge_indexes, node_labels, graph_labels, 
+                                                                   file_path, config, model_name, 
+                                                                   device, verbose=verbose)
     else:
-        raise ValueError(f"Model {model} not supported.")
+        raise ValueError(f"Model {model_name} not supported.")
     
-    dataset = H5Dataset(file_path + f"dataset_{model}.h5", "input", "label")
-    states = H5Dataset(file_path + f"states_{model}.h5", "states", "label")
+    dataset = H5Dataset(file_path + f"dataset_{model_name}.h5", "input", "label")
+    states = H5Dataset(file_path + f"states_{model_name}.h5", "states", "label")
     # FIXME: H5Dataset wants homogeneous arrays
     # node_states = H5Dataset(file_path + f"node_states_{model}.h5", "node_states", "label")
 
-    return dataset, states, node_states, node_labels
+    return dataset, states, node_states, node_labels, edge_indexes, node_labels, graph_labels
 
 
 def ground_truth(dataset_name, testing=False):
     # Load dataset
-    edge_indexes, node_labels, _ = load_classification_dataset(dataset_name, False)
+    edge_indexes, node_labels, _ = load_binary_dataset(dataset_name, False)
     
     if testing == True:
         edge_indexes = edge_indexes[:50]

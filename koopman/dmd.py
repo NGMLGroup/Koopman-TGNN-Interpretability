@@ -26,12 +26,12 @@ class DMD:
             self.emb_engine = TruncatedSVD(n_components=self.k)
         elif self.emb == "PCA":
             self.emb_engine = PCA(n_components=self.k)
-        elif self.emb == None:
+        elif self.emb == None or self.emb == "Identity":
             self.emb_engine = None
             self.k = self.Z.shape[-1]
 
         # compute principal components
-        if self.emb == None:
+        if self.emb == None or self.emb == "Identity":
             self.Zp = Z
         elif len(self.Z.shape) == 2:
             self.Zp = self.emb_engine.fit_transform(self.Z)

@@ -6,8 +6,6 @@ import seaborn as sns
 import pandas as pd
 
 from scipy.stats import mannwhitneyu
-from sklearn.model_selection import train_test_split
-from einops import rearrange
 
 # Configure Matplotlib to use LaTeX for text rendering
 plt.rcParams['text.usetex'] = True
@@ -702,3 +700,27 @@ def auc_analysis_nodes(weights, node_gt, edge_index, plot=False):
         return fig, auc_score
     
     return None, auc_score
+
+
+def autocorrelation_distance(signal1, signal2):
+    """
+    Compute the autocorrelation distance between two signals.
+
+    Args:
+        signal1 (np.ndarray): The first time signal.
+        signal2 (np.ndarray): The second time signal.
+        plot (bool): Whether to plot the autocorrelation distance.
+
+    Returns:
+        autocorrelation_distance: The autocorrelation distance.
+        figure: The plot of the autocorrelation distance.
+    """
+
+    autocorr1 = np.correlate(signal1, signal1, mode='full')
+    autocorr1 = autocorr1 / np.max(np.abs(autocorr1))
+    autocorr2 = np.correlate(signal2, signal2, mode='full')
+    autocorr2 = autocorr2 / np.max(np.abs(autocorr2))
+
+    distance = np.linalg.norm(autocorr1 - autocorr2)
+
+    return None, distance

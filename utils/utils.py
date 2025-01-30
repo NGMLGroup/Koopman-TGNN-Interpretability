@@ -16,7 +16,7 @@ def get_K(config, states):
 
 
 def get_K_from_model(config):
-    from models.DynGraphConvRNN import DynGraphModel
+    from models.models import DynGraphModel
 
     model = DynGraphModel(input_size=1,
                             hidden_size=config['hidden_size'],
@@ -49,6 +49,10 @@ def change_basis(states, v, emb_engine):
 
     assert states.ndim == 3, 'States should have shape [batch or nodes, time, features]'
     b, t, f = states.shape
+
+    if not emb_engine:
+        # If emb_engine is "Identity" return the states
+        return states
     
     states = rearrange(states, 'b t f -> (b t) f')
     states = emb_engine.transform(states)
@@ -107,9 +111,9 @@ def get_weights_from_PCA(node_state, dim_red, method='PCA'):
     return dmd.Zp
 
 
-def run_saliency(edge_indexes, node_labels, graph_labels, config, device, verbose=False):
+def run_saliency(edge_indexes, node_labels, graph_labels, config, model_name, device, verbose=False):
 
-    from models.DynGraphConvRNN import DynGraphModel
+    from models.models import DynGraphModel
     from dataset.utils import DynGraphDataset
     from captum.attr import Saliency
     from tqdm import tqdm
@@ -123,7 +127,8 @@ def run_saliency(edge_indexes, node_labels, graph_labels, config, device, verbos
     dataset = DynGraphDataset(edge_indexes, node_labels, graph_labels)
 
     # Define the model
-    input_size = 1
+    input_size = node_labels[0].shape[-1]
+    output_size = 1 if graph_labels.ndim==1 else graph_labels[0].shape[0]
 
     # Remove the unnecessary return values from the forward method
     class RedDynGraphModel(DynGraphModel):
@@ -136,16 +141,20 @@ def run_saliency(edge_indexes, node_labels, graph_labels, config, device, verbos
         
     model = RedDynGraphModel(input_size=input_size,
                             hidden_size=config['hidden_size'],
+                            output_size=output_size,
                             rnn_layers=config['rnn_layers'],
                             readout_layers=config['readout_layers'],
+                            k_kernel=config['k_kernel'],
+                            evolve_variant=config['evolve_variant'] if 'evolve_variant' in config else None,
+                            encoder_type=model_name,
                             cell_type=config['cell_type'],
                             cat_states_layers=config['cat_states_layers']).to(device)
     
     # Load the model from the file
-    model_filepath = f'models/saved/dynConvRNN_{config["dataset"]}.pt'
+    model_filepath = f'models/saved/{model_name}_{config["dataset"]}.pt'
     if not os.path.exists(model_filepath):
         raise FileNotFoundError(f"Model file '{model_filepath}' not found. Train the model first.")
-    model.load_state_dict(torch.load(model_filepath))
+    model.load_state_dict(torch.load(model_filepath, weights_only=True))
     model = model.to(device)
     model.eval()
 
