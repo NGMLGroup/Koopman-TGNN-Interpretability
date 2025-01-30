@@ -194,98 +194,6 @@ class DCRNN(DynRNNBase):
                                     requires_grad=True)
 
 
-class EvolveGCN(nn.Module):
-    r"""EvolveGCN encoder from the paper `"EvolveGCN: Evolving Graph
-    Convolutional Networks for Dynamic Graphs"
-    <https://arxiv.org/abs/1902.10191>`_ (Pereja et al., AAAI 2020).
-
-    Args:
-        input_size (int): Size of the input.
-        hidden_size (int): Number of hidden units in each hidden layer.
-        n_layers (int): Number of layers in the encoder.
-        asymmetric_norm (bool): Whether to consider the input graph as directed.
-        variant (str): Variant of EvolveGCN to use (options: 'H' or 'O')
-        root_weight (bool): Whether to add a parametrized skip connection.
-        cached (bool): Whether to cache normalized edge_weights.
-        activation (str): Activation after each GCN layer.
-    """
-
-    def __init__(self,
-                 input_size,
-                 hidden_size,
-                 n_layers,
-                 norm,
-                 variant='H',
-                 cat_states_layers: bool = False,
-                 return_only_last_state: bool = False,
-                 root_weight=False,
-                 cached=False,
-                 activation='relu'):
-        super(EvolveGCN, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.cat_states_layers = cat_states_layers
-        self.return_only_last_state = return_only_last_state
-        self.n_layers = n_layers
-        self.rnn_cells = nn.ModuleList()
-        if variant == 'H':
-            cell = EvolveGCNHCell
-        elif variant == 'O':
-            cell = EvolveGCNOCell
-        else:
-            raise NotImplementedError
-
-        for i in range(self.n_layers):
-            self.rnn_cells.append(
-                cell(in_size=self.input_size if i == 0 else self.hidden_size,
-                     out_size=self.hidden_size,
-                     norm=norm,
-                     activation=activation,
-                     root_weight=root_weight,
-                     cached=cached))
-        
-        if not self.cat_states_layers:
-            self.K = nn.Parameter(nn.init.xavier_uniform_(torch.Tensor(hidden_size, hidden_size)),
-                                    requires_grad=True)
-        else:
-            self.K = nn.Parameter(nn.init.xavier_uniform_(torch.Tensor(hidden_size*n_layers, hidden_size*n_layers)),
-                                    requires_grad=True)
-
-    def forward(self, x, edge_index, edge_weight=None):
-        """"""
-        # x : b t n f
-        out_t = []
-        steps = x.size(1)
-        h = [None] * len(self.rnn_cells)
-        for t in range(steps):
-            if isinstance(edge_index, list):
-                edge_index_t = edge_index[t] # to allow for time-varying adjacency matrix
-            else:
-                edge_index_t = edge_index
-            out = x[:, t]
-            out_c = []
-            for c, cell in enumerate(self.rnn_cells):
-                out, h[c] = cell(out, h[c], edge_index_t, edge_weight)
-                out_c.append(out)
-            # append hidden state of the last layer
-            if self.cat_states_layers:
-                h_out = torch.cat(out_c, dim=-1)
-            else:  # or take last layer's state
-                h_out = out_c[-1]
-            out_t.append(h_out)
-
-        out_rec = [out_t[0] @ self.K**step for step in range(steps)]
-        out_rec = torch.stack(out_rec, dim=1)
-
-        if self.return_only_last_state:
-            # out_t: [batch, *, features]
-            return out_t[-1]
-        # out_t: [batch, time, *, features]
-        out_t = torch.stack(out_t, dim=1)
-
-        return out_t, out_c, out_rec
-
-
 class DynGraphModel(BaseModel):
     """
     Simple spatio-temporal model.
@@ -337,17 +245,6 @@ class DynGraphModel(BaseModel):
                             root_weight=True,
                             add_backward=True,
                             bias=True)
-        elif encoder_type == 'evolvegcn':
-            encoder = EvolveGCN(input_size=input_size,
-                                hidden_size=hidden_size,
-                                n_layers=rnn_layers,
-                                norm=None,
-                                variant=evolve_variant,
-                                cat_states_layers=cat_states_layers,
-                                return_only_last_state=False,
-                                root_weight=True,
-                                cached=False,
-                                activation='relu')
         else:
             raise NotImplementedError(f'"{encoder_type}" encoder not implemented.')
             
