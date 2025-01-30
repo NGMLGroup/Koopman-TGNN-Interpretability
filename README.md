@@ -83,15 +83,15 @@ pip install -r requirements.txt
 
 The scripts used for the experiments in the paper are in the main folder.
 
-* `train_tsl_model.py` is used to train the TGNN using the configurations contained in the config file. An example of usage is
+* `train_model.py` is used to train the STGNN using the configurations contained in the config file. An example of usage is
 
 	```
-	python train_tsl_model.py
+	python train_model.py
 	```
-* `experiment_graph.py` is used to perform the explainability methods using the hyperparamenters set in the config file. Use it as follows
+* `run_explainability.py` is used to perform the explainability methods using the hyperparamenters set in the config file. Use it as follows
 
 	```
-	python experiment_graph.py
+	python run_explainability.py
 	```
 
 
